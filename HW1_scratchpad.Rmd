@@ -1,0 +1,281 @@
+---
+title: "moneyball"
+author: "Ethan Haley"
+date: "9/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# load data from Doug's github repo
+d.f <- read.csv('https://raw.githubusercontent.com/douglasbarley/DATA621/main/Homework1/moneyball-training-data.csv')
+summary(d.f)
+```
+```{r}
+head(d.f)
+```
+First row has some outliers (5456 SO's for their pitchers??)
+Team HBP is NA's a  lot
+
+```{r}
+plot(d.f$TEAM_PITCHING_SO, type='h')
+```
+
+```{r}
+hist(d.f$TEAM_FIELDING_E)
+```
+```{r}
+plot(d.f$TEAM_BATTING_HR, type='h')
+```
+```{r}
+
+plot(d.f$TEAM_PITCHING_H, type='h')
+
+```
+```{r}
+plot(d.f$TEAM_PITCHING_BB, type='h')
+```
+
+```{r}
+plot(d.f$TARGET_WINS, type='h')
+```
+### Clipping outliers and imputing missing values: 
+**We should look at using median for outliers instead of clipping**
+
+```{r}
+
+# Impute median for these
+
+d.f$TEAM_BASERUN_CS[is.na(d.f$TEAM_BASERUN_CS)] = median(d.f$TEAM_BASERUN_CS, na.rm=T)
+d.f$TEAM_BASERUN_SB[is.na(d.f$TEAM_BASERUN_SB)] = median(d.f$TEAM_BASERUN_SB, na.rm=T)
+d.f$TEAM_BATTING_SO[is.na(d.f$TEAM_BATTING_SO)] = median(d.f$TEAM_BATTING_SO, na.rm=T)
+d.f$TEAM_PITCHING_SO[is.na(d.f$TEAM_PITCHING_SO)] = median(d.f$TEAM_PITCHING_SO, na.rm=T)
+d.f$TEAM_FIELDING_DP[is.na(d.f$TEAM_FIELDING_DP)] = median(d.f$TEAM_FIELDING_DP, na.rm=T)
+
+
+# Clip these 3  
+
+d.f$TEAM_PITCHING_H = sapply(d.f$TEAM_PITCHING_H, function(x){min(x, 5000)})
+d.f$TEAM_PITCHING_SO = sapply(d.f$TEAM_PITCHING_SO, function(x){min(x, 2500)})
+d.f$TEAM_PITCHING_BB = sapply(d.f$TEAM_PITCHING_BB, function(x){min(x, 1250)})
+
+
+
+```
+
+```{r}
+plot(d.f$TEAM_PITCHING_BB, type='h')
+```
+
+```{r}
+summary(d.f)
+```
+```{r}
+#drop 2 columns
+d.f = subset(d.f, select=-c(INDEX, TEAM_BATTING_HBP))
+summary(d.f)
+```
+```{r}
+# Break TEAM_BATTING_H into singles vs other hits, to avoid duplicating other hits
+singles_hit = d.f$TEAM_BATTING_H - d.f$TEAM_BATTING_2B - d.f$TEAM_BATTING_3B - d.f$TEAM_BATTING_HR
+d.f$TEAM_BATTING_1B = singles_hit
+
+# We only get Hits and HR for Pitching stats, so can only separate into HR vs all others
+hits_allowed = d.f$TEAM_PITCHING_H - d.f$TEAM_PITCHING_HR
+d.f$TEAM_PITCHING_1B2B3B = hits_allowed
+
+d.f = subset(d.f, select=-c(TEAM_BATTING_H, TEAM_PITCHING_H))
+head(d.f)
+```
+```{r}
+# split off a validation set so we can test models on unseen data before evaluating on other provided csv file
+set.seed(621)
+shuffled = sample(1:dim(d.f)[1])
+train_inds = shuffled[1:1800]
+valid_inds = shuffled[1801:length(shuffled)]
+trains = d.f[train_inds,]
+valids = d.f[valid_inds,]
+
+# first linear model, using all features
+m1 = lm(TARGET_WINS ~ ., trains)
+summary(m1)
+```
+```{r}
+# evaluate model on validation set
+m1preds = predict(m1, valids)
+errs = m1preds - valids$TARGET_WINS
+mse = mean(errs * errs)
+print(mse)
+```
+
+```{r}
+var(valids$TARGET_WINS)
+```
+
+**The MSE on validation set was 181.29, which means only 29% of the 255.57 variance was taken care of by the model**
+
+**Get rid of Caught Stealing, BATTING_2B**
+
+```{r}
+subset1 = subset(d.f, select=-c(TEAM_BATTING_2B, TEAM_BASERUN_CS))
+```
+
+```{r}
+# see if the R-Squared goes up by removing extraneous predictors
+trains = subset1[train_inds,]
+valids = subset1[valid_inds,]
+m2 = lm(TARGET_WINS ~ ., trains)
+summary(m2)
+```
+
+That barely moved the needle.  Why was TEAM_PITCHING_HR so unimportant?
+
+```{r}
+plot(d.f$TEAM_PITCHING_HR, type='h')
+```
+```{r}
+colnames(trains)
+```
+```{r}
+# does the batting_HR distribution look very different from the pitching_HR one?
+boxplot(d.f$TEAM_BATTING_HR)
+```
+
+```{r}
+boxplot(d.f$TEAM_PITCHING_HR)
+```
+The boxplots are very similar, so nothing obvious about the PITCHING_HR jumps out (other than the zeros which both have)
+
+```{r}
+colnames(d.f)
+```
+
+```{r}
+# copy the d.f
+subset2 = d.f[,]
+dim(subset2)
+```
+
+Approximate the slugging percentage stat
+```{r}
+subset2$SLUGGING = subset2$TEAM_BATTING_1B + 2 * subset2$TEAM_BATTING_2B +
+  3 * subset2$TEAM_BATTING_3B + 4 * subset2$TEAM_BATTING_HR
+```
+
+Approximate WHIP
+```{r}
+subset2$WHIP = subset2$TEAM_PITCHING_BB + subset2$TEAM_PITCHING_HR + 
+  subset2$TEAM_PITCHING_1B2B3B
+```
+
+Approximate OBP
+```{r}
+subset2$OBP = subset2$TEAM_BATTING_1B + subset2$TEAM_BATTING_2B +
+  subset2$TEAM_BATTING_3B + subset2$TEAM_BATTING_HR + subset2$TEAM_BATTING_BB
+```
+
+Approximate OPS
+```{r}
+subset2$OPS = subset2$OBP + subset2$SLUGGING
+```
+
+Homerun/Strikeout ratio
+```{r}
+subset2$HR2SO = subset2$TEAM_BATTING_HR / subset2$TEAM_BATTING_SO
+subset2$opponentHR2SO = subset2$TEAM_PITCHING_HR / subset2$TEAM_PITCHING_SO
+```
+
+```{r}
+trains = subset2[train_inds,]
+valids = subset2[valid_inds,]
+m3 = lm(TARGET_WINS ~ ., trains)
+summary(m3)
+```
+
+There are 0's in the divisor of the HR/SO ratios just calculated
+
+```{r}
+summary(subset2)
+```
+It makes no sense that a team had 0 strikeouts for or against for an entire season.  Let's fix those zeros.
+
+```{r}
+# What are the lowest non-zero stats, which might indicate 0's being used as NA's, for example
+min(d.f$TEAM_BATTING_SO[d.f$TEAM_BATTING_SO > 0])
+min(d.f$TEAM_PITCHING_SO[d.f$TEAM_PITCHING_SO > 0])
+min(d.f$TEAM_BATTING_HR[d.f$TEAM_BATTING_HR > 0])
+min(d.f$TEAM_PITCHING_HR[d.f$TEAM_PITCHING_HR > 0])
+```
+
+The strikeout stats look very suspicious at zero since the lowest non-zero numbers are 66 and 181.  So let's treat those zeros as NA's and impute via median.
+More questionable is doing the same for HR's here, since the lowest non-zero is 3 for each, making it questionable to impute medians for the zeros. but.....
+
+```{r}
+subset2$TEAM_BATTING_SO[subset2$TEAM_BATTING_SO == 0] = median(subset2$TEAM_BATTING_SO)
+subset2$TEAM_PITCHING_SO[subset2$TEAM_PITCHING_SO == 0] = median(subset2$TEAM_PITCHING_SO)
+subset2$TEAM_BATTING_HR[subset2$TEAM_BATTING_HR == 0] = median(subset2$TEAM_BATTING_HR)
+subset2$TEAM_PITCHING_HR[subset2$TEAM_PITCHING_HR == 0] = median(subset2$TEAM_PITCHING_HR)
+```
+
+Try model fitting again, after recomputing all stats with new non-zeros
+
+```{r}
+trains = subset2[train_inds,]
+valids = subset2[valid_inds,]
+m3 = lm(TARGET_WINS ~ ., trains)
+summary(m3)
+```
+
+**The engineered features that are linear combinations of the other features are worthless.  Remove them.  Oh well. **  
+
+```{r}
+subset2 = subset(subset2, select=-c(SLUGGING, WHIP, OPS, OBP))
+colnames(subset2)
+```
+
+```{r}
+# re-train model with just the non-zeros and the new HR/SO ratios
+trains = subset2[train_inds,]
+valids = subset2[valid_inds,]
+m4 = lm(TARGET_WINS ~ ., trains)
+summary(m4)
+```
+This is really not doing much, if anything.
+
+### Do we need to normalize the data?
+
+```{r}
+# Standard normalize the data, subtracting mean of each column from itself, and dividing by its variance
+target = subset2$TARGET_WINS
+scaled = data.frame(scale(subset2[ , 2:dim(subset2)[2]]))
+scaled = cbind(target, scaled)
+```
+
+```{r}
+head(scaled)
+```
+```{r}
+# try it out on a new model
+trains = scaled[train_inds,]
+valids = scaled[valid_inds,]
+m5 = lm(target ~ ., trains)
+summary(m5)
+```
+Nothing.
+
+**So, no, we don't need to scale the data.**
+**But we should look into log-transforming it maybe**
+
+```{r}
+# remove insignificant predictors and re-run model
+subset3 = subset(subset2, select=-c(TEAM_BATTING_2B, TEAM_BASERUN_CS))
+trains = subset3[train_inds,]
+valids = subset3[valid_inds,]
+m6 = lm(TARGET_WINS ~ ., trains)
+summary(m6)
+```
+That slightly nudged the adjusted r-squared up, as well as the F-stat.  Very slightly.
