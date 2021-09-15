@@ -1,0 +1,569 @@
+---
+title: "FourLinearModels"
+author: ""
+date: "9/15/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Dealing with garbage subsets of the data by training a separate linear model on each subset  
+
+Note that this approach is akin to what we talked about last week -- Using clustering techniques to  
+create features that indicate which hypothetical category each row belongs to (for example, maybe data 
+from 1871 to 1901 are inherently different than modern data, in terms of how they correlate to the target
+outcome).  The difference with the subset-models approach shown below is that the subsets are chosen by hand here, 
+but more importantly, they each have their own entire set of model parameters, not just one single categorical
+parameter which can't make up for the other parameters' bias on its own.  
+
+## Why might this approach be better than imputing missing values, coaxing outliers back to the IQR, entirely ignoring rows that have undesired garbage data, or other techniques that might allow us to fit one linear model well to the whole dataset?  
+
+Instead of sanitizing the garbage as if to correct it, let's inspect whether the inconsistencies in the bad data can give us clues as to what their outcome variable is.  It's entirely possible that missing values in a certain column, for example, represent rows from a certain era of data collection (or maybe simply repeated and predictable errors in data gathering).  Perhaps in that era, strikeouts rates were more related to the response (target) variable, compared to data from other eras.  In that case, we'd want a model that learned a different parameter for the strikeout features, compared to the same parameter in models fit to other eras of data.  The alternative is to pretend that those strikeout feature values should be more normal, which may be equivalent to throwing out good information.  
+
+#### For example: 
+
+```{r}
+# load data from Doug's github repo
+d.f <- read.csv('https://raw.githubusercontent.com/douglasbarley/DATA621/main/Homework1/moneyball-training-data.csv')
+```
+
+What happens if we split the data into 2 subsets:  One set has NA's or 0's for its strikeout columns, while the other set has positive values. 
+
+```{r}
+SO_trouble = d.f[is.na(d.f$TEAM_PITCHING_SO),]
+SO_trouble = rbind(SO_trouble, d.f[(!is.na(d.f$TEAM_PITCHING_SO) & (d.f$TEAM_PITCHING_SO==0)), ])
+SO_trouble$isZero = sapply(SO_trouble$TEAM_PITCHING_SO, function(x){!is.na(x)})
+#SO_trouble
+```
+
+```{r}
+colCode = rep('blue', dim(SO_trouble)[1])
+for (i in 1:length(colCode)) {
+  if (SO_trouble$isZero[i] == 1) {
+    colCode[i] = 'red'
+  }
+}
+plot(SO_trouble$TEAM_BATTING_BB, SO_trouble$TARGET_WINS, col=colCode,
+     main = "Walks predictor vs. Wins Response\nBad/Missing Data Subset of Strikeouts")
+```
+
+
+A linear model fit to the blue data (NA's for Strikeouts) will find a nice, small, expected positive correlation between more team batting BB's and more team wins.  Furthermore the blue cloud looks like real, clean data -- The number of wins is realistic, between 50 and 125 -- whereas the red data (zeros for Strikeouts, which is already garbage) has garbage for target responses (zero wins? 150 wins??).  The number of walks (x-axis) is also much smaller for all red than for all blue.  Why? Who knows? Maybe someone accidentally extrapolated an entire 162-game season from one single game's stats (0 TARGET_WINS), in which they didn't keep track of walks and strikeouts.  Zeros all around.  If that actually happened, we'd like to pick up on that pattern and have our model predict 0 the next time it comes across that combination of values.  In other words, it sure would be nice to fit a different set of linear parameters onto the red data.
+
+
+```{r}
+no_trouble = d.f[!is.na(d.f$TEAM_PITCHING_SO), ]
+no_trouble = d.f[d.f$TEAM_PITCHING_SO > 0, ]
+plot(no_trouble$TEAM_BATTING_BB, no_trouble$TARGET_WINS,
+     main = "Same Chart for Good Data Subset of Strikeouts")
+```
+
+
+
+This subset of data, with positive strikeout values, shows the same general distribution of values as the previous plot, but it wouldn't be so obvious to train separate models on left and right groups, and if you did, you'd have to figure out where to split them.  This group also has less extreme response values, so that any benefits coming from predicting outlier values are reduced for a model.  
+
+## What's a good way to start subsetting the data?  
+
+We could first split our data into two subsets:  One whose rows have no NA's in ANY of their feature values,  
+and another that has at least one NA in each row. 
+```{r}
+# remove meaningless index col
+d.f <- subset(d.f, select = -c(INDEX))
+# most rows have NA for HBP col, so just make a binary for is.na there, and maybe train on it or maybe not
+d.f$TEAM_BATTING_HBP[!is.na(d.f$TEAM_BATTING_HBP)] = 0
+d.f$TEAM_BATTING_HBP[is.na(d.f$TEAM_BATTING_HBP)] = 1
+
+# split off about 20% of the training data to check model fits on
+set.seed(621)
+shuffled = sample(1:dim(d.f)[1])
+
+train_inds = shuffled[1:1800]
+valid_inds = shuffled[1801:length(shuffled)]
+
+trains = d.f[train_inds,]
+valids = d.f[valid_inds,]
+
+# First subset split --> One group has no NA in ANY of its features
+fullTrains = na.omit(trains)
+fullValids = na.omit(valids)
+# .... while the second group has at least one NA in some feature
+naTrains = trains[rowSums(is.na(trains)) > 0, ]
+naValids = valids[rowSums(is.na(valids)) > 0, ]
+
+```
+
+```{r}
+# c(dim(fullTrains)[1], dim(fullValids)[1], dim(naTrains)[1], dim(naValids)[1])
+```
+
+
+```{r}
+#summary(fullTrains)
+```
+
+```{r}
+# Break TEAM_BATTING_H into singles vs other hits, to avoid duplicating other hits
+singles_hit = fullTrains$TEAM_BATTING_H - fullTrains$TEAM_BATTING_2B - fullTrains$TEAM_BATTING_3B - fullTrains$TEAM_BATTING_HR
+fullTrains$TEAM_BATTING_1B = singles_hit
+
+# We only get Hits and HR for Pitching stats, so can only separate into HR vs all others
+hits_allowed = fullTrains$TEAM_PITCHING_H - fullTrains$TEAM_PITCHING_HR
+fullTrains$TEAM_PITCHING_1B2B3B = hits_allowed
+
+# Now we can discard the columns we uwed to make new columns
+fullTrains = subset(fullTrains, select=-c(TEAM_BATTING_H, TEAM_PITCHING_H))
+
+# Create HR-to-SO ratio columns
+fullTrains$HR2SOfor = fullTrains$TEAM_BATTING_HR / fullTrains$TEAM_BATTING_SO
+fullTrains$HR2SOvs  = fullTrains$TEAM_PITCHING_HR / fullTrains$TEAM_PITCHING_SO
+
+for (column in colnames(fullTrains)){
+  fullTrains[paste('log_', column, sep='')] <- log(fullTrains[[column]] + 1)  # +1 for the zeros
+}
+
+fullTrains <- subset(fullTrains, select = -c(log_TARGET_WINS, log_TEAM_BATTING_HBP))
+
+#summary(fullTrains)
+```
+
+We modify the features a bit and fit a linear model to the "cleaner" data:
+
+```{r}
+mod1 = lm(TARGET_WINS ~ ., fullTrains)
+summary(mod1)
+```
+
+Multiple R-squared:  0.4634  
+
+Adjusted R-squared:  0.4479   
+
+F-statistic: 29.93 on 33 and 1144 DF,  p-value: < 2.2e-16
+
+## That's not bad for the non-NA data.  But we have to make predictions for data with NA's eventually.  
+
+Let's see what we get for NA's  
+
+```{r}
+#summary(naTrains)
+```
+
+How tough is this task compared to the cleaner model we just fit?
+
+```{r}
+paste("The variance in response values for the missing data subset is ", round(var(naTrains$TARGET_WINS)))
+paste("For complete data the variance was ", round(var(fullTrains$TARGET_WINS)))
+```
+
+
+There's a lot more chance of making big errors on the missing values subset, 
+based on that difference in response variance.  
+
+### How to deal with each NA in that subset?  
+
+Some variables, like HBP, make it easy by all being missing, so we can remove them.
+```{r}
+naTrains = subset(naTrains, select = -c(TEAM_BATTING_HBP)) # all are NAs
+```
+
+We saw with Strikeouts how merely splitting on one feature's missingness separated the remaining data into different groups.  But it would take awhile to run the same procedure for all columns with missing values.  Maybe we can go halfway by simply turning each such column into a binary variable indicating whether the value provided is NA or numeric.  This may or may not be a standard method, but it does allow a linear model one more dimension to stretch into, should the missingness have some correlation with the target, in combination with other features.  
+
+```{r}
+# Make NA binary indicators for a few columns
+naTrains$TEAM_BASERUN_SB[!is.na(naTrains$TEAM_BASERUN_SB)] = 0
+naTrains$TEAM_BASERUN_SB[is.na(naTrains$TEAM_BASERUN_SB)] = 1
+
+naTrains$TEAM_BASERUN_CS[!is.na(naTrains$TEAM_BASERUN_CS)] = 0
+naTrains$TEAM_BASERUN_CS[is.na(naTrains$TEAM_BASERUN_CS)] = 1
+
+naTrains$TEAM_FIELDING_DP[!is.na(naTrains$TEAM_FIELDING_DP)] = 0
+naTrains$TEAM_FIELDING_DP[is.na(naTrains$TEAM_FIELDING_DP)] = 1
+
+#summary(naTrains)
+```
+
+```{r}
+# Break TEAM_BATTING_H into singles vs other hits, to avoid duplicating other hits
+singles_hit = naTrains$TEAM_BATTING_H - naTrains$TEAM_BATTING_2B - naTrains$TEAM_BATTING_3B - naTrains$TEAM_BATTING_HR
+naTrains$TEAM_BATTING_1B = singles_hit
+
+# We only get Hits and HR for Pitching stats, so can only separate into HR vs all others
+hits_allowed = naTrains$TEAM_PITCHING_H - naTrains$TEAM_PITCHING_HR
+naTrains$TEAM_PITCHING_1B2B3B = hits_allowed
+
+# Now we can discard the columns we uwed to make new columns
+naTrains = subset(naTrains, select=-c(TEAM_BATTING_H, TEAM_PITCHING_H))
+
+#for (column in colnames(naTrains)){
+#  naTrains[paste('log_', column, sep='')] <- log(naTrains[[column]] + 1)  # +1 for the zeros
+#}
+
+#naTrains <- subset(naTrains, select = -c(log_TARGET_WINS, log_TEAM_BATTING_HBP))
+
+#summary(naTrains)
+```
+
+**Zero strikeouts and NA strikeouts**
+
+```{r}
+naSO = naTrains[is.na(naTrains$TEAM_BATTING_SO), ] # SO is NA
+noSO = naTrains[(!is.na(naTrains$TEAM_BATTING_SO)) & (naTrains$TEAM_BATTING_SO == 0), ] # SO is 0
+naTrains = naTrains[(!is.na(naTrains$TEAM_BATTING_SO)) & (naTrains$TEAM_BATTING_SO > 0), ] # all the rest
+
+#print(dim(naSO))
+#print(dim(noSO))
+#print(dim(naTrains))
+```
+
+Within nested subsets now, we can engineer separate features for separate models,
+when we discover strange plots that weren't apparent before subsetting:
+
+```{r}
+plot(c(naSO$TEAM_PITCHING_1B2B3B, noSO$TEAM_PITCHING_1B2B3B), 
+     c(naSO$TARGET_WINS, noSO$TARGET_WINS),
+     col = c(rep('blue', dim(naSO)[1]), rep('red', dim(noSO)[1])),
+     main="Bad Strikeout Data Subset\nHits Allowed vs. Target Wins",
+     xlab="1B2B3B Allowed by team",
+     ylab="Target (Wins)")
+```
+
+Again we see the NA data, in blue, looking separate, all crunched up on the left side with reasonable x and y values.  
+The red (zero SO) data has garbage predictor values and at least one garbage response (lower right corner).  
+
+So let's make a feature for the red model:  An inverse of the x-value, to capture some of the red plot shape.
+
+```{r}
+noSO$invHitsAllowed = 1 / noSO$TEAM_PITCHING_1B2B3B
+```
+
+```{r}
+#noSO
+```
+
+```{r}
+#naSO
+```
+
+```{r}
+naSO = subset(naSO, select = -c(TEAM_BATTING_SO, TEAM_BASERUN_SB, TEAM_BASERUN_CS,
+                                TEAM_PITCHING_SO, TEAM_FIELDING_DP))
+
+for (column in colnames(naSO)){
+  naSO[paste('log_', column, sep='')] <- log(naSO[[column]])
+}
+
+naSO <- subset(naSO, select = -c(log_TARGET_WINS))
+
+#summary(naSO)
+```
+
+```{r}
+noSO = subset(noSO, select = -c(TEAM_BATTING_SO, TEAM_BASERUN_SB, TEAM_BASERUN_CS,
+                                TEAM_PITCHING_SO, TEAM_FIELDING_DP))
+
+for (column in colnames(noSO)){
+  noSO[paste('log_', column, sep='')] <- log(noSO[[column]] + 1) # plus one for zeros
+}
+
+noSO <- subset(noSO, select = -c(log_TARGET_WINS))
+
+#summary(noSO)
+```
+
+Train 3 models on the 3 NA subsets:
+
+```{r}
+naMod1 = lm(TARGET_WINS ~ ., naTrains)
+naMod2 = lm(TARGET_WINS ~ ., naSO)
+naMod3 = lm(TARGET_WINS ~ ., noSO)
+```
+
+```{r}
+summary(naMod1)  # 528 NA rows that had SO info, aka naTrains
+```
+
+The bigger subset, which had strikeout data but was missing something else, had
+Multiple R-squared:  0.4019
+Adjusted R-squared:  0.3856 
+
+Not bad, although not as good as the previous model, which had .45-.46 R-squared.  
+
+How about the NA Strikeout rows model?
+
+```{r}
+summary(naMod2)  # 79 rows that had NA's for SO
+```
+
+Higher R-squared with relatively many variables to fit relatively few datapoints. 
+Lower F-stat.  
+
+And that questionable zero-SO subset model, fit to the bizarre, red points? 
+
+```{r}
+summary(naMod3)
+```
+Uh-oh...
+**There are more variables than rows (n > m) so the matrix is not singular**  
+If we get rid of the log features, it should learn something useful
+
+```{r}
+noSO <- subset(noSO, select = c(colnames(noSO)[1:11]))
+
+#summary(noSO)
+```
+Re-train model 
+
+```{r}
+naMod3 = lm(TARGET_WINS ~ ., noSO)
+summary(naMod3)
+```
+Those are very high R-sq without superlow p-vals, so we probably gave the model too many features (10) to fit to 15 rows.  
+But there are very few validation examples either, so any somewhat close prediction should suffice for these few rows. 
+And remember that this is the garbage data, so if the model picks up on patterns, that's more important than the
+coefficients making sense (they don't!).
+
+### About that Validation Data  
+
+With all these high R-squared on NA data, there may be concern that the validation data will produce some poor numbers.
+
+```{r}
+#summary(valids)
+```
+```{r}
+# Break TEAM_BATTING_H into singles vs other hits, to avoid duplicating other hits
+singles_hit = fullValids$TEAM_BATTING_H - fullValids$TEAM_BATTING_2B - fullValids$TEAM_BATTING_3B - fullValids$TEAM_BATTING_HR
+fullValids$TEAM_BATTING_1B = singles_hit
+
+# We only get Hits and HR for Pitching stats, so can only separate into HR vs all others
+hits_allowed = fullValids$TEAM_PITCHING_H - fullValids$TEAM_PITCHING_HR
+fullValids$TEAM_PITCHING_1B2B3B = hits_allowed
+
+# Now we can discard the columns we uwed to make new columns
+fullValids = subset(fullValids, select=-c(TEAM_BATTING_H, TEAM_PITCHING_H))
+
+# Create HR-to-SO ratio columns
+fullValids$HR2SOfor = fullValids$TEAM_BATTING_HR / fullValids$TEAM_BATTING_SO
+fullValids$HR2SOvs  = fullValids$TEAM_PITCHING_HR / fullValids$TEAM_PITCHING_SO
+
+for (column in colnames(fullValids)){
+  fullValids[paste('log_', column, sep='')] <- log(fullValids[[column]] + 1)  # +1 for the zeros
+}
+
+fullValids <- subset(fullValids, select = -c(log_TARGET_WINS, log_TEAM_BATTING_HBP))
+
+#summary(fullValids)
+```
+
+```{r}
+fullValVar = var(fullValids$TARGET_WINS)
+#fullValVar
+```
+
+See how much variation the trained model takes care of for the full (no NA's) validation subset:
+
+```{r}
+fullValPreds = predict(mod1, fullValids)
+fvErrs = fullValPreds - fullValids$TARGET_WINS
+fvMSE = mean(fvErrs * fvErrs)
+print("Proportion of response variance fitted by model (Approximate R-sq)")
+paste("for predictions on the validation set with no NA's: ", 
+      (fullValVar - fvMSE) / fullValVar)
+```
+
+```{r}
+#summary(naValids)
+```
+```{r}
+naValids = subset(naValids, select = -c(TEAM_BATTING_HBP)) # all are NAs
+
+# Make NA binary indicators for a few columns
+naValids$TEAM_BASERUN_SB[!is.na(naValids$TEAM_BASERUN_SB)] = 0
+naValids$TEAM_BASERUN_SB[is.na(naValids$TEAM_BASERUN_SB)] = 1
+
+naValids$TEAM_BASERUN_CS[!is.na(naValids$TEAM_BASERUN_CS)] = 0
+naValids$TEAM_BASERUN_CS[is.na(naValids$TEAM_BASERUN_CS)] = 1
+
+naValids$TEAM_FIELDING_DP[!is.na(naValids$TEAM_FIELDING_DP)] = 0
+naValids$TEAM_FIELDING_DP[is.na(naValids$TEAM_FIELDING_DP)] = 1
+
+#summary(naValids)
+```
+```{r}
+# Break TEAM_BATTING_H into singles vs other hits, to avoid duplicating other hits
+singles_hit = naValids$TEAM_BATTING_H - naValids$TEAM_BATTING_2B - naValids$TEAM_BATTING_3B - naValids$TEAM_BATTING_HR
+naValids$TEAM_BATTING_1B = singles_hit
+
+# We only get Hits and HR for Pitching stats, so can only separate into HR vs all others
+hits_allowed = naValids$TEAM_PITCHING_H - naValids$TEAM_PITCHING_HR
+naValids$TEAM_PITCHING_1B2B3B = hits_allowed
+
+# Now we can discard the columns we uwed to make new columns
+naValids = subset(naValids, select=-c(TEAM_BATTING_H, TEAM_PITCHING_H))
+
+#for (column in colnames(naTrains)){
+#  naValids[paste('log_', column, sep='')] <- log(naValids[[column]] + 1)  # +1 for the zeros
+#}
+
+#naValids <- subset(naValids, select = -c(log_TARGET_WINS, log_TEAM_BATTING_HBP))
+
+#summary(naValids)
+```
+**Zero strikeouts and NA strikeouts**
+
+```{r}
+naSOval = naValids[is.na(naValids$TEAM_BATTING_SO), ] # SO is NA
+noSOval = naValids[(!is.na(naValids$TEAM_BATTING_SO)) & (naValids$TEAM_BATTING_SO == 0), ] # SO is 0
+naValids = naValids[(!is.na(naValids$TEAM_BATTING_SO)) & (naValids$TEAM_BATTING_SO > 0), ] # all the rest
+
+#print(dim(naSOval))
+#print(dim(noSOval))
+#print(dim(naValids))
+```
+
+
+```{r}
+noSOval$invHitsAllowed = 1 / noSOval$TEAM_PITCHING_1B2B3B
+```
+
+```{r}
+#noSOval
+```
+
+```{r}
+naSOval = subset(naSOval, select = -c(TEAM_BATTING_SO, TEAM_BASERUN_SB, TEAM_BASERUN_CS,
+                                TEAM_PITCHING_SO, TEAM_FIELDING_DP))
+
+for (column in colnames(naSOval)){
+  naSOval[paste('log_', column, sep='')] <- log(naSOval[[column]])
+}
+
+naSOval <- subset(naSOval, select = -c(log_TARGET_WINS))
+
+#summary(naSOval)
+```
+```{r}
+noSOval = subset(noSOval, select = -c(TEAM_BATTING_SO, TEAM_BASERUN_SB, TEAM_BASERUN_CS,
+                                TEAM_PITCHING_SO, TEAM_FIELDING_DP))
+
+for (column in colnames(noSOval)){
+  noSOval[paste('log_', column, sep='')] <- log(noSOval[[column]] + 1) # plus one for zeros
+}
+
+noSOval <- subset(noSOval, select = -c(log_TARGET_WINS))
+
+#summary(noSOval)
+```
+
+See how much the trained models take care of on these rough data rows.  
+
+Models reminder:  
+
+naMod1 = lm(TARGET_WINS ~ ., naTrains)  
+
+naMod2 = lm(TARGET_WINS ~ ., naSO)  
+
+naMod3 = lm(TARGET_WINS ~ ., noSO)  
+
+
+```{r}
+naValVar = var(naValids$TARGET_WINS)
+naValPreds = predict(naMod1, naValids)
+navErrs = naValPreds - naValids$TARGET_WINS
+navMSE = mean(navErrs * navErrs)
+paste("Approximate R-sq for the validation set with NA's but with SO's: ", 
+      (naValVar - navMSE) / naValVar)
+```
+
+```{r}
+naSOValVar = var(naSOval$TARGET_WINS)
+naSOValPreds = predict(naMod2, naSOval)
+naSOVErrs = naSOValPreds - naSOval$TARGET_WINS
+naSOVMSE = mean(naSOVErrs * naSOVErrs)
+paste("Approximate R-sq for the validation set with NA's for SO's: ", 
+      (naSOValVar - naSOVMSE) / naSOValVar)
+```
+
+```{r}
+noSOvalVar = var(noSOval$TARGET_WINS)
+noSOValPreds = predict(naMod3, noSOval)
+noSOVErrs = noSOValPreds - noSOval$TARGET_WINS
+noSOVMSE = mean(noSOVErrs * noSOVErrs)
+paste("Approximate R-sq for the validation set with 0's for SO's: ", 
+      (noSOvalVar - noSOVMSE) / noSOvalVar)
+```
+
+That's surprisingly good, considering how few data there were to train in that last batch, so the model picked up on something important.  
+
+```{r}
+print("True target values first, then predicted ones.")
+print(noSOval$TARGET_WINS)
+print(noSOValPreds)
+```
+
+#### Since predictions are below zero:  
+
+We can get even better results (slightly) by clipping the minimum win predictions to be zero.  
+For example:
+
+```{r}
+for (i in 1:length(noSOValPreds)){
+  noSOValPreds[i] = max(noSOValPreds[i], 0)
+}
+noSOVErrs = noSOValPreds - noSOval$TARGET_WINS
+noSOVMSE = mean(noSOVErrs * noSOVErrs)
+paste("Approximate R-sq for the (clipped prediction) validation set with 0's for SO's: ", 
+      (noSOvalVar - noSOVMSE) / noSOvalVar)
+```
+
+```{r}
+#print(min(naSOValPreds))
+#print(max(naSOValPreds))
+```
+(We can't clip anything useful in the other NA SO group,  
+but should remember to clip the evaluation predictions later.)  
+
+Let's see what the overall validation set MSE or R-squared is, since this should be 
+the best indicator of how our final evaluation predictions will be for the HW.  
+
+
+```{r}
+allVals = c(fullValids$TARGET_WINS, naValids$TARGET_WINS, 
+            noSOval$TARGET_WINS, naSOval$TARGET_WINS)
+#print(length(allVals))
+valVar = var(allVals)
+#valVar
+```
+
+```{r}
+allErrs = c(fvErrs, navErrs, naSOVErrs, noSOVErrs)
+#print(length(allErrs))
+mseVal = mean(allErrs * allErrs)
+```
+
+
+
+```{r}
+paste('Approximate R-squared for the validation set: ', (valVar - mseVal) / valVar)
+```
+
+47.5% of the variance in the validation set was accounted for/fit by the 4-model approach.  
+That's very comparable to, maybe better than, the Training models,   
+and a good indicator of how these four models will end up doing on evaluation set predictions. 
+
+
+-- We can mix the validation data back into the training data if we want, and refit 4 models to it all, before making evaluation predictions.
+
+-- We can also try pruning unimportant variables from each of the four models.  
+
+-- We could look for other features that split usefully into NA, 0, and positive non-NA subsets, the way SO did.  
+
+-- We could statistically compare the distribution of Training values to Evaluation values, to see if they even appear to come from the same distribution.  After all, no point in fitting models that won't apply to the eval set.  (At first glance, I thought they looked similar)  
+
+
+
+
+
+
