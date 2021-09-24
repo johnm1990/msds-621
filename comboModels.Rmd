@@ -1,0 +1,431 @@
+---
+title: "ComboModels"
+author: "Ethan Haley"
+date: "9/23/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# load data from Doug's github repo
+d.f <- read.csv('https://raw.githubusercontent.com/douglasbarley/DATA621/main/Homework1/moneyball-training-data.csv')
+```
+```{r}
+#drop index column
+d.f = subset(d.f, select=-c(INDEX))
+```
+
+Remove redundant columns
+
+```{r}
+# Break TEAM_BATTING_H into singles vs other hits, to avoid duplicating other hits
+singles_hit = d.f$TEAM_BATTING_H - d.f$TEAM_BATTING_2B - d.f$TEAM_BATTING_3B - d.f$TEAM_BATTING_HR
+d.f$TEAM_BATTING_1B = singles_hit
+nonHR_allowed = d.f$TEAM_PITCHING_H - d.f$TEAM_PITCHING_HR
+d.f$PITCHING_1B2B3B = nonHR_allowed
+d.f <- subset(d.f, select = -c(TEAM_BATTING_H, TEAM_PITCHING_H))
+```
+
+```{r}
+cols = names(d.f)
+cols
+```
+
+Remove HBP
+
+```{r}
+d.f = subset(d.f, select = -c(TEAM_BATTING_HBP))
+```
+
+```{r}
+summary(d.f)
+```
+
+
+Split off validation data now
+
+```{r}
+# split off about 20% of the training data to check model fits on
+set.seed(621)
+shuffled = sample(1:dim(d.f)[1])
+
+train_inds = shuffled[1:1800]
+valid_inds = shuffled[1801:length(shuffled)]
+
+trains = d.f[train_inds,]
+valids = d.f[valid_inds,]
+```
+
+
+Split on SB missingness  
+
+```{r}
+NASB = trains[is.na(trains$TEAM_BASERUN_SB),]
+NASB = subset(NASB, select = -c(TEAM_BASERUN_SB))
+SB = trains[!is.na(trains$TEAM_BASERUN_SB),]
+summary(NASB)
+```
+```{r}
+dim(NASB)
+```
+
+
+
+
+```{r}
+NASBmod = lm(TARGET_WINS ~ . , subset(NASB, select = -c(TEAM_FIELDING_DP,TEAM_BASERUN_CS)))
+summary(NASBmod)
+```
+
+Prune
+
+```{r}
+NASBmod = lm(TARGET_WINS ~ . - TEAM_PITCHING_SO - TEAM_BATTING_BB - PITCHING_1B2B3B - TEAM_BATTING_3B, 
+             subset(NASB, select = -c(TEAM_FIELDING_DP,TEAM_BASERUN_CS)))
+summary(NASBmod)
+```
+
+
+That's seemingly very good, albeit it on a small subset of the data.  
+Let's see what kind of variance it fitted away.  
+
+```{r}
+var(NASB$TARGET_WINS)
+```
+
+Adjusted $R^2$ is lagging the non-adjusted a bit, coefficients are significant and are in line with common sense, other than the smallest one, TEAM_PITCHING_BB, sloping very slightly the unexpected way.  But if we prune that, the model loses some accuracy, so that predictor is interacting with some other(s).
+
+In a moment we'll look at what happens if we first choose to subset our data on missing/zero SO data, rather than missing SB data.  But first let's make sure the model we just fitted generalizes to the validation subset of missing SB values.  There is a lot of response variance in this part of the data, the adjusted $R^2$ lags as mentioned, and so the model may not hold up well to the validation.  
+
+```{r}
+NASBval = valids[is.na(valids$TEAM_BASERUN_SB),]
+NASBval = subset(NASBval, select = -c(TEAM_BASERUN_SB))
+SBval = valids[!is.na(valids$TEAM_BASERUN_SB),]
+summary(NASBval)
+```
+
+```{r}
+valPreds = predict(NASBmod, subset(NASBval, select = -c(TEAM_FIELDING_DP,TEAM_BASERUN_CS)))
+valErrs = valPreds - NASBval$TARGET_WINS
+MSE = mean(valErrs * valErrs)
+print("Proportion of response variance fitted by model (Approximate R-sq)")
+paste("for predictions on the validation set with NA's for SB values: ", 
+      (var(NASBval$TARGET_WINS) - MSE) / var(NASBval$TARGET_WINS))
+```
+
+Not as good as hoped, but in line with expected, and this is a small subset that deals with a LOT of variance in the response.  If we use this approach for our final evaluation predictions, we will likely do about this well.
+
+```{r}
+var(NASBval$TARGET_WINS)
+```
+
+Remaining response variance in data that's left:  
+
+```{r}
+var(SB$TARGET_WINS)
+var(SBval$TARGET_WINS)
+```
+
+```{r}
+var(d.f$TARGET_WINS)
+```
+
+We did OK there with an unlucky split of difficult validation variance,  
+and the remaining validation variance is actually less than the training variance.
+
+
+======================== START OF FAILED ATTEMPT BUT LEAVE IT IN =================
+
+Now what if we subsetted first based on zero SO rows?  
+
+```{r}
+zeroSO = trains[(!is.na(trains$TEAM_BATTING_SO)) & (trains$TEAM_BATTING_SO == 0), ] # SO is 0
+nonzeroSO = trains[(is.na(trains$TEAM_BATTING_SO)) | (trains$TEAM_BATTING_SO > 0), ] # all the rest```
+
+zeroSOval = valids[(!is.na(valids$TEAM_BATTING_SO)) & (valids$TEAM_BATTING_SO == 0), ] # SO is 0
+nonzeroSOval = valids[(is.na(valids$TEAM_BATTING_SO)) | (valids$TEAM_BATTING_SO > 0), ] # all the rest
+```
+
+```{r}
+dim(zeroSO)
+dim(nonzeroSO)
+dim(zeroSOval)
+dim(nonzeroSOval)
+```
+
+So this model we're about to fit is expressly made to deal with 15 training rows and 5 validation rows.  It will have to be very parsimonious to have any chance at being reliable later.  
+
+```{r}
+summary(zeroSO)
+```
+
+
+```{r}
+zeroSOmod = lm(TARGET_WINS ~ . , subset(zeroSO, select = -c(TEAM_FIELDING_DP,TEAM_BASERUN_CS,TEAM_BASERUN_SB,TEAM_BATTING_SO,TEAM_PITCHING_SO)))
+summary(zeroSOmod)
+```
+
+
+This model is simply fitting bad parameters to bad data and getting good error results, since the data are so sparse.  Nevertheless, let's just see how the unpruned model does on the 5 validation cases.  
+
+```{r}
+valPreds = predict(zeroSOmod, subset(zeroSOval, select = -c(TEAM_FIELDING_DP,TEAM_BASERUN_CS,TEAM_BASERUN_SB,TEAM_BATTING_SO,TEAM_PITCHING_SO)))
+valErrs = valPreds - zeroSOval$TARGET_WINS
+MSE = mean(valErrs * valErrs)
+print("Proportion of response variance fitted by model (Approximate R-sq)")
+paste("for predictions on the validation set with NA's for SB values: ", 
+      (var(zeroSOval$TARGET_WINS) - MSE) / var(zeroSOval$TARGET_WINS))
+```
+
+```{r}
+var(zeroSO$TARGET_WINS)
+```
+
+This is admittedly a wacky little subset of the data, with huge variance, so maybe explaining half of it on unseen data isn't bad, but note that this is a subset of the NASB (missing vals for stolen bases) data we fit with the first model.  So it seems more prudent to use that first model to deal with all this wackiness and then some, especially when its fit made sense and had significantly better $R^2$  
+
+====================== END OF FAILED ATTEMPT ===============
+
+## Move on to remaining data  
+
+As a reminder, we're left with SB and SBval datasplits  
+
+```{r}
+dim(SB)
+summary(SB)
+```
+
+Inspect the zeros
+
+```{r}
+z = c()
+for (i in 1:15){
+  z <- c(z, paste('There are', sum(SB[names(SB)[i]]==0), 'zeros in', names(SB)[i]))
+}
+z
+```
+
+```{r}
+SB[SB$TARGET_WINS==0, ]
+```
+
+Look for divergent data
+
+```{r}
+SO_trouble = SB[is.na(SB$TEAM_PITCHING_SO),]
+SO_trouble = rbind(SO_trouble, SB[(!is.na(SB$TEAM_PITCHING_SO) & (SB$TEAM_PITCHING_SO==0)), ])
+SO_trouble$isZero = sapply(SO_trouble$TEAM_PITCHING_SO, function(x){!is.na(x)})
+SO_trouble
+```
+```{r}
+colCode = rep('blue', dim(SO_trouble)[1])
+for (i in 1:length(colCode)) {
+  if (SO_trouble$isZero[i] == 1) {
+    colCode[i] = 'red'
+  }
+}
+plot(SO_trouble$PITCHING_1B2B3B, SO_trouble$TARGET_WINS, col=colCode,
+     main = "Hits allowed predictor vs. Wins Response\nBad/Missing Data Subset of Strikeouts")
+```
+```{r}
+dim(SO_trouble)
+```
+
+```{r}
+SO_trouble$invHits = 1 / SO_trouble$PITCHING_1B2B3B
+```
+
+
+```{r}
+summary(SO_trouble)
+```
+
+```{r}
+soMod = lm(TARGET_WINS ~ . - TEAM_BATTING_2B - TEAM_BATTING_3B - 
+             PITCHING_1B2B3B - isZero - TEAM_PITCHING_HR, 
+           subset(SO_trouble, select = -c(TEAM_BATTING_SO, TEAM_BASERUN_CS, TEAM_PITCHING_SO, TEAM_FIELDING_DP)))
+summary(soMod)
+```
+
+Looks good, although small dataset.  Let's see how it validates:  
+
+```{r}
+SO_trouble_VAL = SBval[is.na(SBval$TEAM_PITCHING_SO),]
+SO_trouble_VAL = rbind(SO_trouble_VAL, SBval[(!is.na(SBval$TEAM_PITCHING_SO) & (SBval$TEAM_PITCHING_SO==0)), ])
+SO_trouble_VAL$isZero = sapply(SO_trouble_VAL$TEAM_PITCHING_SO, function(x){!is.na(x)})
+SO_trouble_VAL$invHits = 1 / SO_trouble_VAL$PITCHING_1B2B3B
+SO_trouble_VAL
+```
+
+
+```{r}
+valPreds = predict(soMod, subset(SO_trouble_VAL, select = -c(TEAM_BATTING_SO, TEAM_BASERUN_CS, TEAM_PITCHING_SO, TEAM_FIELDING_DP)))
+valErrs = valPreds - SO_trouble_VAL$TARGET_WINS
+MSE = mean(valErrs * valErrs)
+print("Proportion of response variance fitted by model (Approximate R-sq)")
+paste("for predictions on the validation set with bad SO values: ", 
+      (var(SO_trouble_VAL$TARGET_WINS) - MSE) / var(SO_trouble_VAL$TARGET_WINS))
+```
+
+Quite a dropoff there from the trained model, which was apparently overfit.  But the parameters make sense, and the real issue here is that it's such a small and variable validation subset.  And the validation errors look to be in line with the NA-SB model's.
+
+
+```{r}
+var(SO_trouble$TARGET_WINS)
+var(SO_trouble_VAL$TARGET_WINS)
+```
+
+
+What are we left with now? Make sure we remove correct rows....
+
+```{r}
+dim(SB)
+dim(SBval)
+```
+
+```{r}
+SB_SO = SB[!is.na(SB$TEAM_PITCHING_SO), ]
+SB_SO = SB_SO[SB_SO$TEAM_PITCHING_SO > 0, ]
+SB_SOval = SBval[!is.na(SBval$TEAM_PITCHING_SO), ]
+SB_SOval = SB_SOval[SB_SOval$TEAM_PITCHING_SO > 0, ]
+```
+
+```{r}
+dim(SB_SO)
+dim(SB_SOval)
+```
+
+```{r}
+summary(SB_SO)
+```
+
+```{r}
+hist(SB_SO$TARGET_WINS, breaks = 20)
+```
+Use full data and get logs. 
+Add logarithms of variables, after taking only rows with no NA's
+
+```{r}
+full_SB_SO = na.omit(SB_SO)
+summary(full_SB_SO)
+```
+
+That got rid of zeros too, incidentally  
+
+```{r}
+dim(full_SB_SO)
+```
+
+
+```{r}
+for (column in colnames(full_SB_SO)){
+  full_SB_SO[paste('log_', column, sep='')] <- log(full_SB_SO[[column]] + 1)  # +1 for the zeros
+}
+full_SB_SO <- subset(full_SB_SO, select = -c(log_TARGET_WINS))
+```
+
+```{r}
+full_SB_SO_mod = lm(TARGET_WINS ~ ., full_SB_SO)
+summary(full_SB_SO_mod)
+```
+
+prune!  
+
+```{r}
+full_SB_SO_mod = lm(TARGET_WINS ~ . - TEAM_BATTING_SO - TEAM_BATTING_HR -
+                      log_TEAM_BASERUN_SB - log_TEAM_FIELDING_E - 
+                      TEAM_PITCHING_BB - TEAM_BATTING_1B - log_TEAM_BATTING_1B -
+                      log_PITCHING_1B2B3B - log_TEAM_BASERUN_CS -
+                      TEAM_BATTING_2B, full_SB_SO)
+summary(full_SB_SO_mod)
+```
+
+Comparably lots of data, so it can hold up to lots of predictors.  
+
+```{r}
+full_SB_SOval = na.omit(SB_SOval)
+summary(full_SB_SOval)
+```
+
+
+```{r}
+for (column in colnames(full_SB_SOval)){
+  full_SB_SOval[paste('log_', column, sep='')] <- log(full_SB_SOval[[column]] + 1)  # +1 for the zeros
+}
+full_SB_SOval <- subset(full_SB_SOval, select = -c(log_TARGET_WINS))
+```
+
+```{r}
+valPreds = predict(full_SB_SO_mod, full_SB_SOval)
+valErrs = valPreds - full_SB_SOval$TARGET_WINS
+MSE = mean(valErrs * valErrs)
+print("Proportion of response variance fitted by model (Approximate R-sq)")
+paste("for predictions on the validation set with no NA values: ", 
+      (var(full_SB_SOval$TARGET_WINS) - MSE) / var(full_SB_SOval$TARGET_WINS))
+```
+
+Now for the remaining data, with the NA's  
+
+```{r}
+naTrains = SB_SO[rowSums(is.na(SB_SO)) > 0, ]
+naValids = SB_SOval[rowSums(is.na(SB_SOval)) > 0, ]
+dim(naTrains)
+dim(naValids)
+```
+
+```{r}
+summary(naTrains)
+```
+
+```{r}
+sum(naTrains$PITCHING_1B2B3B > 4000)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
