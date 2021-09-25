@@ -1,0 +1,273 @@
+---
+title: "EvaluationPredictions"
+author: "Ethan Haley"
+date: "9/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# This notebook creates predictions for the evaluation set based on training new models from the entire training set.
+
+```{r}
+# load data from Doug's github repo
+trainDF = read.csv('https://raw.githubusercontent.com/douglasbarley/DATA621/main/Homework1/moneyball-training-data.csv')
+evalDF = read.csv('https://raw.githubusercontent.com/douglasbarley/DATA621/main/Homework1/moneyball-evaluation-data.csv')
+```
+
+Change columns
+
+```{r}
+# remove meaningless index col
+trainDF <- subset(trainDF, select = -c(INDEX))
+evalDF <- subset(evalDF, select = -c(INDEX))
+# most rows have NA for HBP col, so just make a binary for is.na there, and maybe train on it or maybe not
+trainDF$TEAM_BATTING_HBP[!is.na(trainDF$TEAM_BATTING_HBP)] = 0
+trainDF$TEAM_BATTING_HBP[is.na(trainDF$TEAM_BATTING_HBP)] = 1
+
+evalDF$TEAM_BATTING_HBP[!is.na(evalDF$TEAM_BATTING_HBP)] = 0
+evalDF$TEAM_BATTING_HBP[is.na(evalDF$TEAM_BATTING_HBP)] = 1
+
+singles_hit = trainDF$TEAM_BATTING_H - trainDF$TEAM_BATTING_2B - trainDF$TEAM_BATTING_3B - trainDF$TEAM_BATTING_HR
+trainDF$TEAM_BATTING_1B = singles_hit
+
+# We only get Hits and HR for Pitching stats, so can only separate into HR vs all others
+hits_allowed = trainDF$TEAM_PITCHING_H - trainDF$TEAM_PITCHING_HR
+trainDF$TEAM_PITCHING_1B2B3B = hits_allowed
+
+# Now we can discard the columns we used to make new columns
+trainDF = subset(trainDF, select=-c(TEAM_BATTING_H, TEAM_PITCHING_H))
+
+# Repeat for eval data
+singles_hit = evalDF$TEAM_BATTING_H - evalDF$TEAM_BATTING_2B - evalDF$TEAM_BATTING_3B - evalDF$TEAM_BATTING_HR
+evalDF$TEAM_BATTING_1B = singles_hit
+
+# We only get Hits and HR for Pitching stats, so can only separate into HR vs all others
+hits_allowed = evalDF$TEAM_PITCHING_H - evalDF$TEAM_PITCHING_HR
+evalDF$TEAM_PITCHING_1B2B3B = hits_allowed
+
+# Now we can discard the columns we used to make new columns
+evalDF = subset(evalDF, select=-c(TEAM_BATTING_H, TEAM_PITCHING_H))
+
+dim(trainDF)
+dim(evalDF)
+```
+
+ Subset into 4 groups each  
+ 
+```{r}
+fullTrains = na.omit(trainDF)
+fullEvals = na.omit(evalDF)
+# .... while the second group has at least one NA in some feature
+naTrains = trainDF[rowSums(is.na(trainDF)) > 0, ]
+naEvals = evalDF[rowSums(is.na(evalDF)) > 0, ]
+naTrains = subset(naTrains, select = -c(TEAM_BATTING_HBP)) # all are NAs
+naEvals = subset(naEvals, select = -c(TEAM_BATTING_HBP)) # all are NAs 
+
+#logs
+for (column in colnames(fullTrains)){
+  fullTrains[paste('log_', column, sep='')] <- log(fullTrains[[column]] + 1)  # +1 for the zeros
+}
+fullTrains <- subset(fullTrains, select = -c(log_TARGET_WINS, log_TEAM_BATTING_HBP))
+
+for (column in colnames(fullEvals)){
+  fullEvals[paste('log_', column, sep='')] <- log(fullEvals[[column]] + 1)  # +1 for the zeros
+}
+fullEvals <- subset(fullEvals, select = -c(log_TEAM_BATTING_HBP))
+
+for (column in colnames(naTrains)){
+  naTrains[paste('log_', column, sep='')] <- log(naTrains[[column]] + 1)  # +1 for the zeros
+}
+naTrains <- subset(naTrains, select = -c(log_TARGET_WINS))
+
+for (column in colnames(naEvals)){
+  naEvals[paste('log_', column, sep='')] <- log(naEvals[[column]] + 1)  # +1 for the zeros
+}
+```
+
+```{r}
+# Make NA binary indicators for a few columns
+naTrains$TEAM_BASERUN_SB[!is.na(naTrains$TEAM_BASERUN_SB)] = 0
+naTrains$TEAM_BASERUN_SB[is.na(naTrains$TEAM_BASERUN_SB)] = 1
+
+naTrains$TEAM_BASERUN_CS[!is.na(naTrains$TEAM_BASERUN_CS)] = 0
+naTrains$TEAM_BASERUN_CS[is.na(naTrains$TEAM_BASERUN_CS)] = 1
+
+naTrains$TEAM_FIELDING_DP[!is.na(naTrains$TEAM_FIELDING_DP)] = 0
+naTrains$TEAM_FIELDING_DP[is.na(naTrains$TEAM_FIELDING_DP)] = 1
+
+```
+
+```{r}
+# Make NA binary indicators for a few columns
+naEvals$TEAM_BASERUN_SB[!is.na(naEvals$TEAM_BASERUN_SB)] = 0
+naEvals$TEAM_BASERUN_SB[is.na(naEvals$TEAM_BASERUN_SB)] = 1
+
+naEvals$TEAM_BASERUN_CS[!is.na(naEvals$TEAM_BASERUN_CS)] = 0
+naEvals$TEAM_BASERUN_CS[is.na(naEvals$TEAM_BASERUN_CS)] = 1
+
+naEvals$TEAM_FIELDING_DP[!is.na(naEvals$TEAM_FIELDING_DP)] = 0
+naEvals$TEAM_FIELDING_DP[is.na(naEvals$TEAM_FIELDING_DP)] = 1
+
+```
+
+Now split the data with NA's
+
+```{r}
+naSO = naTrains[is.na(naTrains$TEAM_BATTING_SO), ] # SO is NA
+noSO = naTrains[(!is.na(naTrains$TEAM_BATTING_SO)) & (naTrains$TEAM_BATTING_SO == 0), ] # SO is 0
+naTrains = naTrains[(!is.na(naTrains$TEAM_BATTING_SO)) & (naTrains$TEAM_BATTING_SO > 0), ] # all the rest
+```
+
+```{r}
+naSOeval = naEvals[is.na(naEvals$TEAM_BATTING_SO), ] # SO is NA
+noSOeval = naEvals[(!is.na(naEvals$TEAM_BATTING_SO)) & (naEvals$TEAM_BATTING_SO == 0), ] # SO is 0
+naEvals = naEvals[(!is.na(naEvals$TEAM_BATTING_SO)) & (naEvals$TEAM_BATTING_SO > 0), ] # all the rest
+```
+
+For full model add HR/SO ratio 
+
+```{r}
+# Create HR-to-SO ratio columns
+fullTrains$HR2SOfor = fullTrains$TEAM_BATTING_HR / fullTrains$TEAM_BATTING_SO
+fullTrains$HR2SOvs  = fullTrains$TEAM_PITCHING_HR / fullTrains$TEAM_PITCHING_SO
+```
+
+```{r}
+# Create HR-to-SO ratio columns
+fullEvals$HR2SOfor = fullEvals$TEAM_BATTING_HR / fullEvals$TEAM_BATTING_SO
+fullEvals$HR2SOvs  = fullEvals$TEAM_PITCHING_HR / fullEvals$TEAM_PITCHING_SO
+```
+
+
+
+```{r}
+model2 = lm(TARGET_WINS ~ . - TEAM_BATTING_SO - TEAM_BATTING_1B - log_TEAM_BASERUN_SB - 
+              log_TEAM_FIELDING_E - TEAM_PITCHING_BB - TEAM_PITCHING_HR - 
+              log_TEAM_BATTING_1B - log_TEAM_PITCHING_1B2B3B - TEAM_FIELDING_DP -
+              log_TEAM_BATTING_HR, fullTrains)
+summary(model2)
+```
+
+ ==============
+ Full Eval Preds 
+ ==============
+ 
+```{r}
+m2preds = predict(model2, fullEvals)
+m2preds
+```
+ 
+ Next up is the remaining data whose SO values are positive integers  
+ but some other predictor is NA.  [naTrains and naEvals]  
+ 
+
+```{r}
+#remove constructed log cols with NA's
+naTrains = subset(naTrains, select = -c(log_TEAM_BASERUN_SB, log_TEAM_BASERUN_CS, log_TEAM_FIELDING_DP))
+summary(naTrains)
+```
+
+
+- TEAM_BATTING_HR - TEAM_PITCHING_HR - TEAM_BATTING_BB - 
+              TEAM_FIELDING_DP - TEAM_BATTING_SO - TEAM_PITCHING_SO
+
+```{r}
+model3 = lm(TARGET_WINS ~ . - TEAM_FIELDING_DP - log_TEAM_BATTING_3B - TEAM_PITCHING_1B2B3B - log_TEAM_PITCHING_BB - log_TEAM_BATTING_HR - log_TEAM_BATTING_BB - TEAM_BATTING_BB - TEAM_BATTING_HR - TEAM_BATTING_2B - TEAM_BATTING_1B - log_TEAM_PITCHING_HR - TEAM_BATTING_3B - 
+              TEAM_PITCHING_HR, naTrains)
+summary(model3)
+```
+
+ ==============
+ Pos SO NA other Preds 
+ ==============
+
+```{r}
+m3preds = predict(model3, naEvals)
+m3preds
+```
+
+Now naSO and naSOeval  (NA SO values)
+
+```{r}
+naSO = subset(naSO, select = -c(TEAM_BATTING_SO, TEAM_PITCHING_SO, log_TEAM_BATTING_SO, 
+                                log_TEAM_BASERUN_CS, log_TEAM_PITCHING_SO))
+naSO = subset(naSO, select = -c(TEAM_FIELDING_DP, TEAM_BASERUN_SB, TEAM_BASERUN_CS))
+summary(naSO)
+```
+
+```{r}
+model4 = lm(TARGET_WINS ~ ., naSO)
+summary(model4)
+```
+
+ ==============
+ NA SO Preds 
+ ==============
+ 
+```{r}
+m4preds = predict(model4, naSOeval)
+m4preds
+```
+ 
+Last, zero SO data  
+
+```{r}
+noSO$invHitsAllowed = 1 / noSO$TEAM_PITCHING_1B2B3B
+noSOeval$invHitsAllowed = 1 / noSOeval$TEAM_PITCHING_1B2B3B
+noSO = subset(noSO, select = -c(TEAM_BATTING_SO, TEAM_PITCHING_SO, TEAM_FIELDING_DP, 
+                                log_TEAM_BATTING_SO, log_TEAM_BASERUN_SB, log_TEAM_BASERUN_CS, 
+                                log_TEAM_PITCHING_SO, log_TEAM_FIELDING_DP))
+summary(noSO)
+```
+
+```{r}
+model5 = lm(TARGET_WINS ~ . - log_TEAM_BATTING_2B - TEAM_BASERUN_CS - log_TEAM_BATTING_3B - 
+              log_TEAM_PITCHING_HR - TEAM_BATTING_3B - TEAM_BATTING_2B - log_TEAM_BATTING_BB - 
+              TEAM_BATTING_1B - TEAM_PITCHING_1B2B3B - log_TEAM_PITCHING_1B2B3B, noSO)
+summary(model5)
+```
+
+ ==============
+ Zero SO Preds 
+ ==============
+
+```{r}
+m5preds = predict(model5, noSOeval)
+m5preds
+```
+
+Clip to 0 wins predicted
+ 
+```{r}
+m5preds = pmax(m5preds, 0)
+m5preds
+```
+
+Patch the 4 predictions back in the necessary order:  
+
+```{r}
+evals = data.frame(ind=as.integer(c(names(m2preds), names(m3preds), names(m4preds), names(m5preds))), 
+                   pred=c(m2preds,m3preds,m4preds,m5preds))
+```
+
+```{r}
+evals
+```
+
+```{r}
+evals = evals[order(evals$ind), ]
+evals
+```
+```{r}
+evals = subset(evals, select = c(pred))
+evals
+```
+```{r}
+write.csv(evals, "evalPredsMoneyball.csv")
+```
+
+
+
