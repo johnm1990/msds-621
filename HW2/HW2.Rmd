@@ -2,7 +2,9 @@
 title: "HW2"
 author: "Ethan Haley"
 date: "9/28/2021"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -18,10 +20,10 @@ Homework #2 Assignment Requirements
 In this homework assignment, you will work through various classification metrics. You will be asked to create functions in R to carry out the various calculations. You will also investigate some functions in packages that will let you obtain the equivalent results. Finally, you will create graphical output that also can be used to evaluate the output of classification models, such as binary logistic regression.  
 
 Supplemental Material
- Applied Predictive Modeling, Ch. 11 (provided as a PDF file).
- Web tutorials: http://www.saedsayad.com/model_evaluation_c.htm
+ - Applied Predictive Modeling, Ch. 11 (provided as a PDF file).
+ - Web tutorials: http://www.saedsayad.com/model_evaluation_c.htm
 Deliverables (100 Points)
- Upon following the instructions below, use your created R functions and the other packages to generate the classification metrics for the provided data set. A write-up of your solutions submitted in PDF format.   
+ - Upon following the instructions below, use your created R functions and the other packages to generate the classification metrics for the provided data set. A write-up of your solutions submitted in PDF format.   
 
 Instructions
 Complete each of the following steps as instructed:  
@@ -34,12 +36,28 @@ head(d.f)
 ```
 
 
+
 2. The data set has three key columns we will use:  
 
- class: the actual class for the observation
- scored.class: the predicted class for the observation (based on a threshold of 0.5)
- scored.probability: the predicted probability of success for the observation
-Use the table() function to get the raw confusion matrix for this scored dataset. Make sure you understand the output. In particular, do the rows represent the actual or predicted class? The columns?  
+ - **class**: the actual class for the observation
+ - **scored.class**: the predicted class for the observation (based on a threshold of 0.5)
+ - **scored.probability**: the predicted probability of success for the observation
+Use the **table()** function to get the raw confusion matrix for this scored dataset. Make sure you understand the output. In particular, do the rows represent the actual or predicted class? The columns?   
+
+```{r}
+
+```
+
+#### Before we calculate all the metrics, we can build the pieces
+
+```{r}
+# Calculate all the pieces we need
+FP = sum(d.f$scored.class - d.f$class == 1)
+paste("False Positive rate is", round(FP  * 100 / dim(d.f)[1], 2), "%")
+TP = 0
+FN = 0
+TN = 0 
+```
 
 3. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
 and returns the accuracy of the predictions.  
@@ -103,7 +121,7 @@ Specificity = $\frac{TN}{FP+TN}$
 
 8. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the F1 score of the predictions. 
 
-$F1~ Score = \frac{2 × 𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 × 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦 }{𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 + 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦 }$  
+$F1~ Score = \frac{2 \times Precisiion \times Sensitivity}{Precisiion + Sensitivity}$  
 
 ```{r}
 
@@ -111,7 +129,7 @@ $F1~ Score = \frac{2 × 𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 × 𝑆𝑒𝑛𝑠
 
 
 
-9. Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 < 𝑎 < 1 and 0 < 𝑏 < 1 then 𝑎𝑏 < 𝑎)  
+9. Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 $\alpha$ < 1 and 0 < $\beta$ < 1 then $\alpha \cdot \beta$ < $\alpha$)  
 
 ```{r}
 
@@ -144,7 +162,7 @@ $F1~ Score = \frac{2 × 𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 × 𝑆𝑒𝑛𝑠
 
 
 13. Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results compare with your own functions?
-   $F1 ~𝑆𝑐𝑜𝑟𝑒 =  $
+   $F1Score =  $
    
 ```{r}
 
