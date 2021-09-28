@@ -48,12 +48,14 @@ Use the **table()** function to get the raw confusion matrix for this scored dat
 
 ```
 
-#### Before we calculate all the metrics, we can build the pieces
+#### Before we calculate all the metrics, we can build the pieces  
+
+
 
 ```{r}
 # Calculate all the pieces we need
 FP = sum(d.f$scored.class - d.f$class == 1)
-paste("False Positive rate is", round(FP  * 100 / dim(d.f)[1], 2), "%")
+#paste("False Positive rate is", round(FP  * 100 / dim(d.f)[1], 2), "%")
 TP = 0
 FN = 0
 TN = 0 
@@ -161,8 +163,8 @@ $F1~ Score = \frac{2 \times Precisiion \times Sensitivity}{Precisiion + Sensitiv
 
 
 
-13. Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results compare with your own functions?
-   $F1Score =  $
+13. Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results compare with your own functions?  
+
    
 ```{r}
 
