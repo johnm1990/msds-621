@@ -26,7 +26,13 @@ Deliverables (100 Points)
 Instructions
 Complete each of the following steps as instructed:  
 
-1. Download the classification output data set (attached in Blackboard to the assignment).  
+1. Download the classification output data set (attached in Blackboard to the assignment).   
+
+```{r}
+d.f = read.csv('https://raw.githubusercontent.com/ebhtra/msds-621/main/HW2/classification-output-data.csv')
+head(d.f)
+```
+
 
 2. The data set has three key columns we will use:  
 
@@ -38,43 +44,114 @@ Use the table() function to get the raw confusion matrix for this scored dataset
 3. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
 and returns the accuracy of the predictions.  
 
-𝑇𝑃 + 𝑇𝑁 𝐴𝑐𝑐𝑢𝑟𝑎𝑐𝑦= 𝑇𝑃+𝐹𝑃+𝑇𝑁+𝐹𝑁  
+Accuracy = $\frac{TP+TN}{TP+FP+TN+FN}$
+
+```{r}
+
+```
+
 
 4. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
-and returns the classification error rate of the predictions.  
+and returns the classification error rate of the predictions. 
 
-𝐹𝑃 + 𝐹𝑁 𝐶𝑙𝑎𝑠𝑠𝑖𝑓𝑖𝑐𝑎𝑡𝑖𝑜𝑛 𝐸𝑟𝑟𝑜𝑟 𝑅𝑎𝑡𝑒 = 𝑇𝑃 + 𝐹𝑃 + 𝑇𝑁 + 𝐹𝑁
-Verify that you get an accuracy and an error rate that sums to one.
-   
+Classification Error Rate = $\frac{FP+FN}{TP+FP+TN+FN}$
+
+
+```{r}
+
+```
+
+
+Verify that you get an accuracy and an error rate that sums to one.  
+
+```{r}
+
+```
+
+
+
 5. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
 and returns the precision of the predictions.  
 
-𝑇𝑃 𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 = 𝑇𝑃 + 𝐹𝑃  
+Precision = $\frac{TP}{TP+FP}$
+
+```{r}
+
+```
+
+
 
 6. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the sensitivity of the predictions. Sensitivity is also known as recall.  
 
-𝑇𝑃 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦 = 𝑇𝑃 + 𝐹𝑁  
+Sensitivity = $\frac{TP}{TP+FN}$  
+
+```{r}
+
+```
+
 
 7. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
 and returns the specificity of the predictions.  
 
-𝑇𝑁 𝑆𝑝𝑒𝑐𝑖𝑓𝑖𝑐𝑖𝑡𝑦 = 𝑇𝑁 + 𝐹𝑃  
+Specificity = $\frac{TN}{FP+TN}$  
 
-8. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the F1 score of the predictions.  
+```{r}
 
-2 × 𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 × 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦 𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 + 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦  
+```
 
-9. Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 < 𝑎 < 1 and 0 < 𝑏 < 1 then 𝑎𝑏 < 𝑎.)  
 
-10. Write a function that generates an ROC curve from a data set with a true classification column (class in our example) and a probability column (scored.probability in our example). Your function should return a list that includes the plot of the ROC curve and a vector that contains the calculated area under the curve (AUC). Note that I recommend using a sequence of thresholds ranging from 0 to 1 at 0.01 intervals.  
 
-11. Use your created R functions and the provided classification output data set to produce all of the classification metrics discussed above.  
+8. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the F1 score of the predictions. 
+
+$F1~ Score = \frac{2 × 𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 × 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦 }{𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 + 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦 }$  
+
+```{r}
+
+```
+
+
+
+9. Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 < 𝑎 < 1 and 0 < 𝑏 < 1 then 𝑎𝑏 < 𝑎)  
+
+```{r}
+
+```
+
+
+
+10. Write a function that generates an ROC curve from a data set with a true classification column (class in our example) and a probability column (scored.probability in our example). Your function should return a list that includes the plot of the ROC curve and a vector that contains the calculated area under the curve (AUC). Note that I recommend using a sequence of thresholds ranging from 0 to 1 at 0.01 intervals.   
+
+```{r}
+
+```
+
+
+
+11. Use your created R functions and the provided classification output data set to produce all of the classification metrics discussed above.   
+
+```{r}
+
+```
+
+
 
 12. Investigate the caret package. In particular, consider the functions confusionMatrix, sensitivity, and specificity. Apply the functions to the data set. How do the results compare with your own functions?  
 
+```{r}
+
+```
+
+
+
 13. Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results compare with your own functions?
-   𝐹1 𝑆𝑐𝑜𝑟𝑒 =  
+   $F1 ~𝑆𝑐𝑜𝑟𝑒 =  $
    
+```{r}
+
+```
+
+
+
 
 
 
