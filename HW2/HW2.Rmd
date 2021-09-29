@@ -3,8 +3,8 @@ title: "Homework #2 Classification Metrics"
 author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath"
 date: "9/28/2021"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -146,7 +146,7 @@ Specificity = $\frac{TN}{FP+TN}$
 
 8. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the F1 score of the predictions. 
 
-$F1~ Score = \frac{2 \times Precisiion \times Sensitivity}{Precisiion + Sensitivity}$  
+$F1~ Score = \frac{2 \times Precision \times Sensitivity}{Precision + Sensitivity}$  
 
 ```{r}
 
@@ -154,11 +154,22 @@ $F1~ Score = \frac{2 \times Precisiion \times Sensitivity}{Precisiion + Sensitiv
 
 
 
-9. Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 $\alpha$ < 1 and 0 < $\beta$ < 1 then $\alpha \cdot \beta$ < $\alpha$)  
+9. Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 < $\alpha$ < 1 and 0 < $\beta$ < 1 then $\alpha \cdot \beta$ < $\alpha$)  
 
-```{r}
 
-```
+$F1~ Score = \frac{2 \times Precision \times Sensitivity}{Precision + Sensitivity}$, where Precision = $\frac{TP}{TP+FP}$ and Sensitivity = $\frac{TP}{TP+FN}$  
+
+All of TP, FP, and FN are non-negative integers by definition, so we don't have to consider negative values here.
+
+If TP equals 0, then Precision and Sensitivity are either 0 or undefined, and in either case, the F1 Score is undefined. 
+
+All remaining possibilities involve TP being a positive integer.  
+
+The $F1~ Score = \frac{2 \times \frac{TP}{TP+FP} \times \frac{TP}{TP+FN}}{\frac{TP}{TP+FP} + \frac{TP}{TP+FN}} = \frac{2\cdot TP}{2\cdot TP+FN+FP}$  
+
+If both FN and FP are equal to 0, then we get the upper bound on F1, which is 1.  
+The lower bound is if TP is equal to 1, in which case we get $\frac{2}{2+FN+FP}$, which approaches 0 as FN and/or FP approach infinity.  Thus, $0\lt F1 \le 1$ if F1 is defined.  Note that a tighter lower bound is provided by the number of predictions, $n$:  $\frac{2}{1+n}$, since $FN+FP \le n-1$.  
+
 
 
 
