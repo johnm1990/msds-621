@@ -1,5 +1,5 @@
 ---
-title: "Homework #2 Assignment Requirement"
+title: "Homework #2 Classification Metrics"
 author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath"
 date: "9/28/2021"
 output:
