@@ -1,6 +1,6 @@
 ---
-title: "HW2"
-author: "Ethan Haley"
+title: "Homework #2 Classification Metrics"
+author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath"
 date: "9/28/2021"
 output:
   pdf_document: default
@@ -9,6 +9,8 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
 ```
 
  DATA 621 – Business Analytics and Data Mining
@@ -33,6 +35,7 @@ Complete each of the following steps as instructed:
 ```{r}
 d.f = read.csv('https://raw.githubusercontent.com/ebhtra/msds-621/main/HW2/classification-output-data.csv')
 head(d.f)
+colnames(d.f)
 ```
 
 
@@ -45,8 +48,21 @@ head(d.f)
 Use the **table()** function to get the raw confusion matrix for this scored dataset. Make sure you understand the output. In particular, do the rows represent the actual or predicted class? The columns?   
 
 ```{r}
+data1 <- d.f %>% 
+  select(class, scored.class, scored.probability)
+head(data1)
 
 ```
+
+A confusion matrix shows the number of correct and incorrect predictions made by the classification model compared to the actual outcomes (target value) in the data. The matrix is NxN, where N is the number of target values (classes). Performance of such models is commonly evaluated using the data in the matrix. The following table displays a 2x2 confusion matrix for two classes (Positive and Negative).
+
+```{r}
+cm_df <- dplyr::select(data1, scored.class, class)
+table(cm_df)
+
+
+```
+
 
 #### Before we calculate all the metrics, we can build the pieces  
 
