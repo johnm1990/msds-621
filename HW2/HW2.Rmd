@@ -59,8 +59,6 @@ A confusion matrix shows the number of correct and incorrect predictions made by
 ```{r}
 cm_df <- dplyr::select(data1, scored.class, class)
 table(cm_df)
-
-
 ```
 
 
@@ -70,12 +68,21 @@ table(cm_df)
 
 ```{r}
 # Calculate all the pieces we need
-FP = sum(d.f$scored.class - d.f$class == 1)
-#paste("False Positive rate is", round(FP  * 100 / dim(d.f)[1], 2), "%")
-TP = 0
-FN = 0
-TN = 0 
+FP = function(d.f, predicted, actual) sum(d.f[predicted] - d.f[actual] == 1)
+TP = function(d.f, predicted, actual) sum(d.f[predicted] * d.f[actual] == 1)
+FN = function(d.f, predicted, actual) sum(d.f[predicted] - d.f[actual] == -1)
+TN = function(d.f, predicted, actual) sum(d.f[predicted] + d.f[actual] == 0) 
 ```
+
+```{r}
+# test above funcs vs the confusion matrix 
+FP(d.f, 'scored.class', 'class')
+TP(d.f, 'scored.class', 'class')
+FN(d.f, 'scored.class', 'class')
+TN(d.f, 'scored.class', 'class')
+```
+
+
 
 3. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
 and returns the accuracy of the predictions.  
