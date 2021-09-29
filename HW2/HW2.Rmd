@@ -1,6 +1,6 @@
 ---
-title: "HW2"
-author: "Ethan Haley"
+title: "Homework #2 Assignment Requirement"
+author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath"
 date: "9/28/2021"
 output:
   pdf_document: default
