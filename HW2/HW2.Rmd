@@ -254,6 +254,52 @@ The lower bound is if TP is equal to 1, in which case we get $\frac{2}{2+FN+FP}$
 ## Step 10. 
 Write a function that generates an ROC curve from a data set with a true classification column (class in our example) and a probability column (scored.probability in our example). Your function should return a list that includes the plot of the ROC curve and a vector that contains the calculated area under the curve (AUC). Note that I recommend using a sequence of thresholds ranging from 0 to 1 at 0.01 intervals.   
 
+
+====== modified version of what we worked on Thurs.pm together:
+
+```{r}
+get_roc_curve <- function(df, actual, predicted_probability ) {
+  
+  tpr = c()  # collect true positive rates at each threshold
+  fpr = c()  # and false positive rates
+  
+  for (threshold in seq(1, 0, -.01) ) {
+    predictions = 1 * (df[predicted_probability] > threshold)
+    
+    tpr <- c(tpr, sum(predictions * df[actual] == 1) / sum(df[actual] == 1) )
+    fpr <- c(fpr, sum(predictions - df[actual] == 1) / sum(df[actual] == 0) )
+    
+  }
+  
+  par(pty='s')  # square plot is best
+  plot_roc <- plot(fpr, tpr, type='l', asp=1) 
+  
+  #calculate AUC ## Area under the curve: 0.8503
+  #library(pROC)
+  #auc(df$class, df$scored.probability)
+  auc = 0
+  for (i in 2:length(fpr)){
+    if (fpr[i] > fpr[i-1]){  # every time fpr changes, calculate new area using trapezoid area
+      if (tpr[i] > tpr[i-1]){  # if tpr changed at same threshold fpr did
+        auc = auc + (fpr[i] - fpr[i-1]) * (tpr[i] + tpr[i-1]) / 2
+      }
+      else {  # tpr didn't change but fpr did so it's a rectangle
+        auc = auc + (fpr[i] - fpr[i-1]) * tpr[i]
+      }
+    }
+  }
+  paste("AUC using trapezoid approximation:", round(auc, 4))
+}
+
+#test our function
+get_roc_curve(data1 , "class", "scored.probability")
+
+```
+
+
+====== Original version of what we had:
+
+
 ```{r}
 roc_curve <- data.frame((threshhold = seq(0, 1, .01)) )
 roc_curve
