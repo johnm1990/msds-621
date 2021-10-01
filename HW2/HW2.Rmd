@@ -3,7 +3,17 @@ title: "Homework #2 Classification Metrics"
 author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath"
 date: "9/28/2021"
 output:
-  html_document: default
+
+  html_document: 
+    toc: true
+    toc-title: "Homework #2 Classification Metrics"
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    theme: united
+    highlight: tango
+
   pdf_document: default
 ---
 
@@ -17,7 +27,7 @@ library(tidyverse)
  
 Homework #2 Assignment Requirements  
 
- Overview  
+# Overview  
  
 In this homework assignment, you will work through various classification metrics. You will be asked to create functions in R to carry out the various calculations. You will also investigate some functions in packages that will let you obtain the equivalent results. Finally, you will create graphical output that also can be used to evaluate the output of classification models, such as binary logistic regression.  
 
@@ -27,10 +37,13 @@ Supplemental Material
 Deliverables (100 Points)
  - Upon following the instructions below, use your created R functions and the other packages to generate the classification metrics for the provided data set. A write-up of your solutions submitted in PDF format.   
 
-Instructions
+--- 
+
+# Instructions
 Complete each of the following steps as instructed:  
 
-1. Download the classification output data set (attached in Blackboard to the assignment).   
+## Step 1. 
+Download the classification output data set (attached in Blackboard to the assignment).   
 
 ```{r}
 d.f = read.csv('https://raw.githubusercontent.com/ebhtra/msds-621/main/HW2/classification-output-data.csv')
@@ -39,8 +52,10 @@ colnames(d.f)
 ```
 
 
+--- 
 
-2. The data set has three key columns we will use:  
+## Step 2. 
+The data set has three key columns we will use:  
 
  - **class**: the actual class for the observation
  - **scored.class**: the predicted class for the observation (based on a threshold of 0.5)
@@ -84,77 +99,139 @@ TN(d.f, 'scored.class', 'class')
 
 
 
-3. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
-and returns the accuracy of the predictions.  
+--- 
+
+## Step 3. 
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the accuracy of the predictions.  
+
 
 Accuracy = $\frac{TP+TN}{TP+FP+TN+FN}$
 
 ```{r}
+get_accuracy <- function(df, actual, predicted  ) {
+  df_table <- table(select(df, actual, predicted))   
+  TP <- df_table[2,2]
+  TN <- df_table[1,1]
+  FN <- df_table[2,1]
+  FP <- df_table[1,2]
+    
+  return ((TP + TN) / (TP + FP + TN + FN))
+}
 
 ```
 
+--- 
 
-4. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
-and returns the classification error rate of the predictions. 
+## Step 4. 
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the classification error rate of the predictions. 
 
 Classification Error Rate = $\frac{FP+FN}{TP+FP+TN+FN}$
 
 
 ```{r}
-
+get_err_rate <- function(df, actual, predicted  ) {
+  df_table <- table(select(df, actual, predicted))   
+  TP <- df_table[2,2]
+  TN <- df_table[1,1]
+  FN <- df_table[2,1]
+  FP <- df_table[1,2]
+    
+  return ((FP + FN) / (TP + FP + TN + FN))
+}
 ```
 
 
 Verify that you get an accuracy and an error rate that sums to one.  
 
-```{r}
-
+```{r message=FALSE}
+get_accuracy(d.f, "class", "scored.class") + get_err_rate(d.f, "class", "scored.class")
 ```
 
+--- 
 
-
-5. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
-and returns the precision of the predictions.  
+## Step 5. 
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the precision of the predictions.  
 
 Precision = $\frac{TP}{TP+FP}$
 
 ```{r}
-
+get_precision <- function(df, actual, predicted  ) {
+  df_table <- table(select(df, actual, predicted))   
+  TP <- df_table[2,2]
+  TN <- df_table[1,1]
+  FN <- df_table[2,1]
+  FP <- df_table[1,2]
+    
+  return (TP / (TP + FP))
+}
 ```
 
 
+--- 
 
-6. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the sensitivity of the predictions. Sensitivity is also known as recall.  
+## Step 6. 
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the sensitivity of the predictions. Sensitivity is also known as recall.  
 
 Sensitivity = $\frac{TP}{TP+FN}$  
 
 ```{r}
-
+get_sensitivity <- function(df, actual, predicted  ) {
+  df_table <- table(select(df, actual, predicted))   
+  TP <- df_table[2,2]
+  TN <- df_table[1,1]
+  FN <- df_table[2,1]
+  FP <- df_table[1,2]
+    
+  return (TP / (TP + FN))
+}
 ```
 
+--- 
 
-7. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
-and returns the specificity of the predictions.  
+## Step 7. 
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the specificity of the predictions.  
 
 Specificity = $\frac{TN}{FP+TN}$  
 
 ```{r}
-
+get_specificity <- function(df, actual, predicted  ) {
+  df_table <- table(select(df, actual, predicted))   
+  TP <- df_table[2,2]
+  TN <- df_table[1,1]
+  FN <- df_table[2,1]
+  FP <- df_table[1,2]
+    
+  return (TN / (TN + FP))
+}
 ```
 
 
+--- 
 
-8. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the F1 score of the predictions. 
+## Step 8. 
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the F1 score of the predictions. 
 
 $F1~ Score = \frac{2 \times Precision \times Sensitivity}{Precision + Sensitivity}$  
 
 ```{r}
+get_F1_score <- function(df, actual, predicted  ) {
+  precision <- get_precision(df, actual, predicted)
+  sensitivity <- get_sensitivity(df, actual, predicted)
+    
+  return ((2*precision*sensitivity) / (precision+sensitivity))
+}
 
+#testing the fucntion
+get_F1_score(d.f, "class", "scored.class")
 ```
 
 
+--- 
 
-9. Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 < $\alpha$ < 1 and 0 < $\beta$ < 1 then $\alpha \cdot \beta$ < $\alpha$)  
+
+## Step 9. 
+Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 < $\alpha$ < 1 and 0 < $\beta$ < 1 then $\alpha \cdot \beta$ < $\alpha$)  
+
 
 
 $F1~ Score = \frac{2 \times Precision \times Sensitivity}{Precision + Sensitivity}$, where Precision = $\frac{TP}{TP+FP}$ and Sensitivity = $\frac{TP}{TP+FN}$  
@@ -168,36 +245,76 @@ All remaining possibilities involve TP being a positive integer.
 The $F1~ Score = \frac{2 \times \frac{TP}{TP+FP} \times \frac{TP}{TP+FN}}{\frac{TP}{TP+FP} + \frac{TP}{TP+FN}} = \frac{2\cdot TP}{2\cdot TP+FN+FP}$  
 
 If both FN and FP are equal to 0, then we get the upper bound on F1, which is 1.  
-The lower bound is if TP is equal to 1, in which case we get $\frac{2}{2+FN+FP}$, which approaches 0 as FN and/or FP approach infinity.  Thus, $0\lt F1 \le 1$ if F1 is defined.  Note that a tighter lower bound is provided by the number of predictions, $n$:  $\frac{2}{1+n}$, since $FN+FP \le n-1$.  
+The lower bound is if TP is equal to 1, in which case we get $\frac{2}{2+FN+FP}$, which approaches 0 as FN and/or FP approach infinity.  Thus, 0 < F1 $\le$ 1 if F1 is defined.  Note that a tighter lower bound is provided by the number of predictions, $n$:  $\frac{2}{1+n}$, since $FN+FP \le n-1$.  
 
 
 
+--- 
 
-10. Write a function that generates an ROC curve from a data set with a true classification column (class in our example) and a probability column (scored.probability in our example). Your function should return a list that includes the plot of the ROC curve and a vector that contains the calculated area under the curve (AUC). Note that I recommend using a sequence of thresholds ranging from 0 to 1 at 0.01 intervals.   
+## Step 10. 
+Write a function that generates an ROC curve from a data set with a true classification column (class in our example) and a probability column (scored.probability in our example). Your function should return a list that includes the plot of the ROC curve and a vector that contains the calculated area under the curve (AUC). Note that I recommend using a sequence of thresholds ranging from 0 to 1 at 0.01 intervals.   
+
+```{r}
+roc_curve <- data.frame((threshhold = seq(0, 1, .01)) )
+roc_curve
+
+get_roc_curve <- function(df, actual, predicted_probility ) {
+  
+  tp = c()
+  fp = c()
+  tn = c()
+  
+  for ( threshhold in seq(0, 1, .01) ) {
+    predictions = 1 * (df[predicted_probility] > threshhold)
+    
+    tp <- c(tp, mean(predictions * df[actual] == 1) )
+    fp <- c(fp, mean(predictions - df[actual] == 1) )
+    
+    tn <- c(tn, mean(predictions + df[actual] == 0) )
+    
+  }
+  
+  #plot_roc <- plot(fp, tp,  type="b", lty=2 , lwd=3) 
+  
+  #calculate AUC ## Area under the curve: 0.8503
+  #library(pROC)
+  #auc(df$class, df$scored.probability)
+  
+  mean(tn / (tn + fp))
+}
+
+#test our function
+get_roc_curve(data1 , "class", "scored.probability")
+
+#score <- integrate(Vectorize(get_roc_curve(data1 , "class", "scored.probability")), lower = 0, upper =1)
+#score
+
+```
+
+--- 
+
+## Step 11. 
+Use your created R functions and the provided classification output data set to produce all of the classification metrics discussed above.   
 
 ```{r}
 
 ```
 
 
+--- 
 
-11. Use your created R functions and the provided classification output data set to produce all of the classification metrics discussed above.   
-
-```{r}
-
-```
-
-
-
-12. Investigate the caret package. In particular, consider the functions confusionMatrix, sensitivity, and specificity. Apply the functions to the data set. How do the results compare with your own functions?  
+## Step 12. 
+Investigate the caret package. In particular, consider the functions confusionMatrix, sensitivity, and specificity. Apply the functions to the data set. How do the results compare with your own functions?  
 
 ```{r}
 
 ```
 
 
+--- 
 
-13. Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results compare with your own functions?  
+## Step 13. 
+Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results compare with your own functions?  
 
    
 ```{r}
@@ -205,6 +322,7 @@ The lower bound is if TP is equal to 1, in which case we get $\frac{2}{2+FN+FP}$
 ```
 
 
+--- 
 
 
 
