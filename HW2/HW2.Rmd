@@ -3,6 +3,7 @@ title: "Homework #2 Classification Metrics"
 author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath"
 date: "9/28/2021"
 output:
+
   html_document: 
     toc: true
     toc-title: "Homework #2 Classification Metrics"
@@ -12,6 +13,7 @@ output:
       smooth_scroll: false
     theme: united
     highlight: tango
+
   pdf_document: default
 ---
 
@@ -96,10 +98,12 @@ TN(d.f, 'scored.class', 'class')
 ```
 
 
+
 --- 
 
 ## Step 3. 
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the accuracy of the predictions.  
+
 
 Accuracy = $\frac{TP+TN}{TP+FP+TN+FN}$
 
@@ -224,8 +228,10 @@ get_F1_score(d.f, "class", "scored.class")
 
 --- 
 
+
 ## Step 9. 
 Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 < $\alpha$ < 1 and 0 < $\beta$ < 1 then $\alpha \cdot \beta$ < $\alpha$)  
+
 
 
 $F1~ Score = \frac{2 \times Precision \times Sensitivity}{Precision + Sensitivity}$, where Precision = $\frac{TP}{TP+FP}$ and Sensitivity = $\frac{TP}{TP+FN}$  
