@@ -1,0 +1,131 @@
+---
+title: "Homework #3 Binary  logistic  regression  models "
+author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath"
+date: "10/11/2021"
+output:
+  html_document: 
+    toc: true
+    toc-title: "Homework #3 - Binary logistic regression models"
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    theme: united
+    highlight: tango
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if (!require("ggplot2",character.only = TRUE)) (install.packages("ggplot2",dep=TRUE))
+if (!require("knitr",character.only = TRUE)) (install.packages("knitr",dep=TRUE))
+if (!require("xtable",character.only = TRUE)) (install.packages("xtable",dep=TRUE))
+if (!require("dplyr",character.only = TRUE)) (install.packages("dplyr",dep=TRUE))
+if (!require("stringr",character.only = TRUE)) (install.packages("stringr",dep=TRUE))
+library(ggplot2)
+library(knitr)
+library(xtable)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(dplyr)
+```
+
+ DATA 621 – Business Analytics and Data Mining
+ 
+Homework #3 Assignment Requirements  
+In this homework assignment, you will explore, analyze and model a data set containing information on crime 
+for various neighborhoods of a major city. Each record has a response variable indicating whether or not the crime 
+rate is above the median crime rate (1) or not (0). 
+ 
+Your  objective  is  to  build  a  binary  logistic  regression  model  on  the  training  data  set  to  predict  whether  the 
+neighborhood  will  be  at  risk  for  high  crime  levels.  You  will  provide  classifications  and  probabilities  for  the 
+evaluation data  set using  your  binary  logistic  regression  model. You  can only  use  the  variables  given  to  you (or 
+variables that you derive from the variables provided). Below is a short description of the variables of interest in 
+the data set
+
+# Overview  
+ 
+```{r libraries & reading data}
+crime_eval_df <- read.csv("https://raw.githubusercontent.com/johnm1990/DATA621/main/hw3/crime-evaluation-data_modified.csv")
+crime_train_df <- read.csv("https://raw.githubusercontent.com/johnm1990/DATA621/main/hw3/crime-training-data_modified.csv")
+```
+
+```{r section1}
+# create summaries for every variable showing basic summaries + NAs
+### add the standard deviations to our summaries
+summary(crime_train_df)
+# Scatterplots between the independent variables and the # wins
+##matrix of scatterplots
+###Change the scale
+# Simple Bar Plot, adjust the scale of the bar plot
+counts <- table(crime_train_df$target)
+barplot(counts, main="Crime Distribution", 
+   xlab="Number of Neighborhoods")
+#scatterplots for the target and predictors
+pairs(~target + dis +  lstat + ptratio ,
+      pch = 19, data = crime_train_df)
+```
+
+
+```{r}
+#Corelations
+library(corrplot)
+cor_train <- cor(crime_train_df)
+corrplot(cor_train)
+```
+
+
+
+
+```{r section 2}
+crime_train_df$log_tax <- log(crime_train_df$tax)
+summary(crime_train_df)
+crime_train_df$chas <-  as.factor(crime_train_df$chas)
+crime_train_df$target <-  as.factor(crime_train_df$target)
+# creating buckets based on the number of wins to explore the data
+crime_train_df$statbuk <- as.numeric(cut_number(crime_train_df$lstat,5))
+table(crime_train_df$statbuk)
+#check if high SDs, then transform
+```
+
+```{r}
+library(MASS)
+library(caret)
+
+set.seed(123)
+split <- caret::createDataPartition(crime_train_df$target, p=0.80, list=FALSE)
+
+train <- crime_train_df[split, ]
+validation <- crime_train_df[ -split, ]
+
+#Step 1: Create a full model
+model.full  <- glm(target ~ ., data = train, family = 'binomial')
+summary(model.full)
+```
+
+```{r}
+#Step 2: Create a backward model using the full model 
+model.backward <- model.full %>% stepAIC(direction = "backward", trace = FALSE)
+summary(model.backward)
+```
+
+```{r}
+#Getting formula for the model 
+formula(model.backward)
+```
+
+```{r}
+# generating the predictors
+model.backward.pred =predict(model.backward, newdata = validation)
+model.backward.pred[model.backward.pred >= 0.5] <- 1
+model.backward.pred[model.backward.pred < 0.5] <- 0
+model.backward.pred = as.factor(model.backward.pred)
+
+#  generating the confusion matrix
+model.backward.confusion.matrix <- confusionMatrix(model.backward.pred, validation$target, mode = "everything")
+
+model.backward.confusion.matrix
+
+```
+
