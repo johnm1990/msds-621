@@ -1,0 +1,325 @@
+---
+title: "Homework #3 Binary  logistic  regression  models "
+author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath, Arushi Arora"
+date: "11/1/2021"
+output:
+  html_document: 
+    toc: true
+    toc-title: "Homework #3 - Binary logistic regression models"
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    theme: darkly
+    highlight: pygments
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+if (!require("ggplot2",character.only = TRUE)) (install.packages("ggplot2",dep=TRUE))
+if (!require("knitr",character.only = TRUE)) (install.packages("knitr",dep=TRUE))
+if (!require("xtable",character.only = TRUE)) (install.packages("xtable",dep=TRUE))
+if (!require("dplyr",character.only = TRUE)) (install.packages("dplyr",dep=TRUE))
+if (!require("stringr",character.only = TRUE)) (install.packages("stringr",dep=TRUE))
+library(ggplot2)
+library(knitr)
+library(xtable)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(dplyr)
+library(ROCR)
+library(Hmisc)
+library(corrplot)
+library(MASS)
+library(caret)
+library(data.table)
+require(data.table)
+require(car)
+require(corrgram)
+require(ggplot2)
+```
+
+ DATA 621 – Business Analytics and Data Mining
+
+# Overview 
+
+Homework #3 Assignment Requirements  
+In this homework assignment, you will explore, analyze and model a data set containing information on crime 
+for various neighborhoods of a major city. Each record has a response variable indicating whether or not the crime 
+rate is above the median crime rate (1) or not (0). 
+ 
+Your  objective  is  to  build  a  binary  logistic  regression  model  on  the  training  data  set  to  predict  whether  the 
+neighborhood  will  be  at  risk  for  high  crime  levels.  You  will  provide  classifications  and  probabilities  for  the 
+evaluation data  set using  your  binary  logistic  regression  model. You  can only  use  the  variables  given  to  you (or 
+variables that you derive from the variables provided). Below is a short description of the variables of interest in 
+the data set
+
+
+ 
+```{r libraries & reading data}
+crime_eval_df <- read.csv("https://raw.githubusercontent.com/johnm1990/DATA621/main/hw3/crime-evaluation-data_modified.csv")
+crime_train_df <- read.csv("https://raw.githubusercontent.com/johnm1990/DATA621/main/hw3/crime-training-data_modified.csv")
+```
+
+
+
+## 1.  Data Exploration
+
+
+
+```{r}
+head(crime_train_df, 1)
+```
+
+
+
+
+```{r}
+###summary statistics
+summary(crime_train_df)
+sapply(crime_train_df, sd, na.rm=TRUE)
+sapply(crime_train_df, hist, na.rm=TRUE)
+
+##correlation matrix
+crime_train_df.rcorr = rcorr(as.matrix(crime_train_df))
+crime_train_df.rcorr
+
+crime_train_df.cor = cor(crime_train_df)
+corrplot(crime_train_df.cor)
+#correlation_matrix = crime_train_df.corr()
+
+
+#correlation plot
+crime_train_df.cor = cor(crime_train_df)
+corrplot(crime_train_df.cor)
+
+cor_distarget <- cor.test(crime_train_df$dis, crime_train_df$target)
+cor_distarget
+
+cor_noxtarget <- cor.test(crime_train_df$nox, crime_train_df$target)
+cor_noxtarget
+
+cor_taxrad<- cor.test(crime_train_df$tax, crime_train_df$rad)
+cor_taxrad
+
+#ttests to look at difference in means between target = 0 and target = 1, maybe to help create buckets
+Ttest_targetpt<- t.test(crime_train_df$ptratio ~ crime_train_df$target)
+Ttest_targetpt
+
+Ttest_targetnox<- t.test(crime_train_df$nox ~ crime_train_df$target)
+Ttest_targetnox
+
+Ttest_targetpt<- t.test(crime_train_df$ptratio ~ crime_train_df$target)
+Ttest_targetpt
+
+Ttest_targetlstat<- t.test(crime_train_df$lstat ~ crime_train_df$target)
+Ttest_targetlstat
+
+
+```
+
+## 2.  Data Preparation
+
+```{r}
+crime_train_df$target <-  as.factor(crime_train_df$target)
+boxplot(crime_train_df$zn ~ crime_train_df$target)
+hist(crime_train_df$zn)
+table(crime_train_df$zn[crime_train_df$zn<10])
+hist(crime_train_df$zn[crime_train_df$zn>0])
+table(crime_train_df$target[crime_train_df$zn > 22])
+crime_train_df['zn_hi'] = crime_train_df$zn > 22
+boxplot(crime_train_df$indus ~ crime_train_df$target)
+hist(crime_train_df$indus)
+table(crime_train_df$indus[crime_train_df$indus > 18])
+table(crime_train_df$target[(crime_train_df$indus>18) & (crime_train_df$indus<20)])
+table(crime_train_df$target[(crime_train_df$indus>20)])
+
+
+#Make a dummy indicator for 18<indus<20  
+
+crime_train_df['indus19'] = crime_train_df$indus > 18 & crime_train_df$indus < 20
+ 
+
+boxplot(crime_train_df$nox ~ crime_train_df$target)
+boxplot(crime_train_df$rm ~ crime_train_df$target)
+
+boxplot(crime_train_df$age ~ crime_train_df$target)
+hist(crime_train_df$age[crime_train_df$target==0])
+
+#That looks normal for the lower crime areas.  How about the higher ones?  
+
+hist(crime_train_df$age[crime_train_df$target==1])
+crime_train_df['sq_age'] = crime_train_df$age ** 2
+boxplot(crime_train_df$dis ~ crime_train_df$target)
+sd(crime_train_df$dis[crime_train_df$target==1])
+sd(crime_train_df$dis[crime_train_df$target==0])
+hist(log(crime_train_df$dis))
+
+hist(log(crime_train_df$dis[crime_train_df$target==0]))
+hist(log(crime_train_df$dis[crime_train_df$target==1]))
+
+#Taking the log normalizes the predictor conditioned on the response, so log_dis should be useful.
+
+crime_train_df['log_dis'] = log(crime_train_df$dis)
+boxplot(crime_train_df$rad ~ crime_train_df$target)
+
+sd(crime_train_df$rad[crime_train_df$target==1])
+sd(crime_train_df$rad[crime_train_df$target==0])
+
+hist(crime_train_df$rad)
+
+table(crime_train_df$target[crime_train_df$rad>15])
+
+mean(crime_train_df$indus19[crime_train_df$rad>8])
+
+ 
+#Yes, that's just redundancy.  What about at the lower end of the range? 
+ 
+mean(crime_train_df$indus19[crime_train_df$rad<5])
+
+crime_train_df['rad5to8'] = 5 < crime_train_df$rad & crime_train_df$rad < 8
+
+boxplot(crime_train_df$tax ~ crime_train_df$target)
+
+sd(crime_train_df$tax[crime_train_df$target==1])
+sd(crime_train_df$tax[crime_train_df$target==0])
+
+
+#Very different variances
+
+hist(crime_train_df$tax)
+crime_train_df['log_tax'] = log(crime_train_df$tax)
+table(crime_train_df$tax[crime_train_df$tax>600])
+
+#That's just weird, why 666?  
+
+table(crime_train_df$target[crime_train_df$tax == 666])
+
+
+#That's the same table as rad > 15.  More redundancy probably.  
+
+sum(crime_train_df$tax==666 & crime_train_df$rad>15)
+
+
+#What about the tax == 711:
+
+
+table(crime_train_df$target[crime_train_df$tax==711])
+
+#Will indus19 take care of those 5, so that we can ignore tax > 600 ?  
+
+sum(crime_train_df$tax==711 & crime_train_df$indus19)
+
+table(crime_train_df$target[crime_train_df$tax==711 & !crime_train_df$indus19])
+
+crime_train_df['tax_666'] = crime_train_df$tax==666
+
+
+boxplot(crime_train_df$ptratio ~ crime_train_df$target)
+hist(crime_train_df$ptratio[crime_train_df$target==1])
+table(crime_train_df$ptratio[crime_train_df$ptratio>19])
+table(crime_train_df$target[crime_train_df$ptratio==20.2])
+
+crime_train_df['pt_peak'] = crime_train_df$ptratio == 20.2
+crime_train_df['log_ptrat'] = log(crime_train_df$ptratio)
+
+
+boxplot(crime_train_df$lstat ~ crime_train_df$target)
+
+hist(crime_train_df$lstat)
+
+
+crime_train_df['log_lstat'] = log(crime_train_df$lstat)
+
+boxplot(crime_train_df$medv ~ crime_train_df$target)
+```
+
+
+
+
+## 3. Build the Models
+
+```{r}
+
+set.seed(123)
+split <- caret::createDataPartition(crime_train_df$target, p=0.90, list=FALSE)
+train <- crime_train_df[split, ]
+validation <- crime_train_df[ -split, ]
+#Step 1: Create a full model
+model.full  <- glm(target ~ . , data = train, family = 'binomial')
+summary(model.full)
+```
+
+
+```{r}
+#Step 2: Create a backward model using the full model 
+model.backward <- model.full %>% stepAIC(direction = "backward", trace = FALSE)
+summary(model.backward)
+```
+
+
+```{r}
+#Getting formula for the model 
+formula(model.backward)
+```
+
+
+
+
+## 4. Select Models
+
+```{r}
+# generating the predictors
+model.backward.pred =predict(model.backward, newdata = validation)
+model.backward.pred[model.backward.pred >= 0.5] <- 1
+model.backward.pred[model.backward.pred < 0.5] <- 0
+model.backward.pred = as.factor(model.backward.pred)
+
+
+#  generating the confusion matrix
+model.backward.confusion.matrix <- confusionMatrix(model.backward.pred, validation$target, mode = "everything")
+model.backward.confusion.matrix
+
+```
+
+
+```{r}
+par(mfrow=c(1,1))
+hvalues <- influence(model.backward)$hat
+stanresDeviance <- residuals(model.backward)/sqrt(1-hvalues)
+plot(hvalues,stanresDeviance,ylab="Standardized Deviance Residuals",xlab="Leverage Values",ylim=c(-3,3),xlim=c(-0.05,0.7))
+abline(v=2*7/length(train),lty=2)
+identify(hvalues,stanresDeviance,cex=0.75)
+```
+Check the full dataset fit with the backward-fit last model.
+
+```{r}
+fullFit = glm(formula = target ~ zn + nox + rm + age + dis + rad + tax + 
+    ptratio + lstat + medv + zn_hi + indus19 + log_dis + rad5to8 + 
+    log_tax + log_ptrat + log_lstat, family = "binomial", data = crime_train_df)
+summary(fullFit)
+```
+
+
+
+```{r}
+
+
+p <- predict(model.backward, type = "response")
+roc_pred <- prediction(predictions = p,labels=model.backward$y)
+
+auc.tmp <- performance(roc_pred,"auc"); auc <- as.numeric(auc.tmp@y.values)
+auc
+
+#plotting roc
+roc_perf <- performance(roc_pred , "tpr" , "fpr")
+plot(roc_perf,
+     colorize = TRUE,
+     print.cutoffs.at= seq(0,1,0.05),
+     text.adj=c(-0.2,1.7))
+
+
+```
+
