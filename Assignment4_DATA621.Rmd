@@ -1,0 +1,109 @@
+---
+title: "Assignment#4 - ML regression and BL regression models "
+author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath, Arushi Arora"
+date: "11/07/2021"
+output:
+  html_document: 
+    toc: true
+    toc-title: "Assignment 4 - Multiple linear regression and Binary logistic regression models  "
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    theme: darkly
+    highlight: pygments
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+if (!require("ggplot2",character.only = TRUE)) (install.packages("ggplot2",dep=TRUE))
+if (!require("knitr",character.only = TRUE)) (install.packages("knitr",dep=TRUE))
+if (!require("xtable",character.only = TRUE)) (install.packages("xtable",dep=TRUE))
+if (!require("dplyr",character.only = TRUE)) (install.packages("dplyr",dep=TRUE))
+if (!require("stringr",character.only = TRUE)) (install.packages("stringr",dep=TRUE))
+if (!require("Hmisc",character.only = TRUE)) (install.packages("Hmisc",dep=TRUE))
+library(ggplot2)
+library(knitr)
+library(xtable)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(dplyr)
+library(ROCR)
+library(Hmisc)
+library(corrplot)
+library(MASS)
+library(caret)
+library(data.table)
+require(data.table)
+require(car)
+require(corrgram)
+require(ggplot2)
+```
+
+
+```{r reading data}
+ins_train_df <- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/insurance_training_data.csv")
+ins_eval_df <- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/insurance-evaluation-data.csv")
+```
+
+
+ DATA 621 – Business Analytics and Data Mining
+ 
+
+# Overview  
+In this homework assignment, you will explore, analyze and model a data set containing approximately 8000 
+records  representing  a  customer  at  an  auto  insurance  company.  Each  record  has  two  response  variables.  The 
+first  response  variable, TARGET_FLAG, is a 1 or a 0. A “1” means that the person was in a car crash. A zero 
+means that the person was not in a car crash. The second response variable is TARGET_AMT. This value is zero 
+if the person did not crash their car. But if they did crash their car, this number will be a value greater than zero. 
+ 
+Your objective is to build multiple linear regression and binary logistic regression models on the training data 
+to predict the probability that a person will crash their car and also the amount of money it will cost if the person 
+does crash their car. You can only use the variables given to you (or variables that you derive from the variables 
+provided). 
+
+- **INDEX**:  Identification Variable (do not use)
+- **TARGET_FLAG**: Was Car in a crash? 1=YES 0=NO None
+- **TARGET_AMT**: If car was in a crash, what was the cost None
+- **AGE**: Age of Driver Very young people tend to be risky. Maybe very old people also.
+- **BLUEBOOK**: Value of Vehicle Unknown effect on probability of collision, but probably effect the payout if there is a crash
+- **CAR_AGE**: Vehicle Age Unknown effect on probability of collision, but probably effect the payout if there is a crash
+- **CAR_TYPE**: Type of Car Unknown effect on probability of collision, but probably effect the payout if there is a crash
+- **CAR_USE**: Vehicle Use Commercial vehicles are driven more, so might increase probability of collision
+- **CLM_FREQ**: # Claims (Past 5 Years) The more claims you filed in the past, the more you are likely to file in the future
+- **EDUCATION**: Max Education Level Unknown effect, but in theory more educated people tend to drive more safely
+- **HOMEKIDS**: # Children at Home Unknown effect
+- **HOME_VAL**: Home Value In theory, home owners tend to drive more responsibly
+- **INCOME**: Income In theory, rich people tend to get into fewer crashes
+- **JOB**: Job Category In theory, white collar jobs tend to be safer
+- **KIDSDRIV**: # Driving Children When teenagers drive your car, you are more likely to get into crashes
+- **MSTATUS**: Marital Status In theory, married people drive more safely
+- **MVR_PTS**: Motor Vehicle Record Points If you get lots of traffic tickets, you tend to get into more crashes
+- **OLDCLAIM**: Total Claims (Past 5 Years) If your total payout over the past five years was high, this suggests future payouts will be high
+- **PARENT1**: Single Parent Unknown effect
+- **RED_CAR**: A Red Car Urban legend says that red cars (especially red sports cars) are more risky. Is that true?
+- **REVOKED**: License Revoked (Past 7 Years) If your license was revoked in the past 7 years, you probably are a more risky driver.
+- **SEX**: Gender Urban legend says that women have less crashes then men. Is that true?
+- **TIF**: Time in Force People who have been customers for a long time are usually more safe.
+- **TRAVTIME**: Distance to Work Long drives to work usually suggest greater risk
+- **URBANICITY**: Home/Work Area Unknown
+- **YOJ**: Years on Job People who stay at a job for a long time are usually more safe
+
+# DATA EXPLORATION
+```{r}
+head(ins_train_df)
+summary(ins_train_df)
+```
+
+
+# DATA PREPARATION
+
+# BUILD MODELS 
+
+# SELECT MODELS
+
+
+ 
+
