@@ -1,0 +1,64 @@
+---
+title: "DATA 621 - Final Project Proposal"
+author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath, Arushi Arora"
+date: "11/07/2021"
+output:
+  html_document: 
+    toc: true
+    toc-title: "DATA 621 - Final Project Proposal"
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    theme: darkly
+    highlight: pygments
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+
+```
+
+ DATA 621 – Business Analytics and Data Mining
+ 
+
+# Requirements
+The final course project will be done in Group (depending on your own choice). You may choose your own topics (and teammates) by yourself. The purpose of this project is to explore, analyze and model a real-world data set of your own interest using the regression modeling techniques learned in the course.
+The real-world data set can be either:
+⦁	A data set that you have personally collected (e.g., at your workplace, internship, etc.).
+⦁	An open-source data set that you have downloaded from the Internet (e.g., CDC, NIH, NHANES, MEPS, BRFSS, Kaggle, InfoChimps, etc.).
+⦁	Textbook exercises are not suitable for course projects.
+
+You will need to develop a problem statement and research question(s) based on the data set that you have obtained. You must survey the state-of-the-art literature and research developments dealing with empirical studies, algorithms, or methodologies related to your problem. You will need to achieve two deliverables: 1) Presentation slides and 2) a final report. These deliverables will be submitted on Blackboard.
+
+
+# Abstract and Keywords
+Use 250 words or less to summarize your problem, methodology, and major outcomes.
+
+
+
+Key words: Select a few key words (up to five) related to your work.
+•
+•
+•
+•
+•
+
+# Introduction
+Describe the background and motivation of your problem.
+
+
+# Literature Review and Methodology
+Discuss how other researchers have addressed similar problems, what their achievements are, and what the advantage and drawbacks of each    reviewed
+
+approach are. Explain how your investigation is similar or different to the state-of-the- art. Please cite the relevant papers where appropriate.
+
+
+# References and Appendices: 
+Be sure to cite all references used in the report (APA format).
+
+
+
+
+ 
