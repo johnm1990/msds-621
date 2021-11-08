@@ -1,0 +1,599 @@
+---
+title: "Homework #3:  Binary Logistic Regression Models"
+author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath, Arushi Arora"
+date: "11/1/2021"
+output:
+  pdf_document: default
+  html_document: 
+    toc: true
+    toc-title: "Homework #3:  Binary Logistic Regression Models"
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    theme: darkly
+    highlight: pygments
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+if (!require("ggplot2",character.only = TRUE)) (install.packages("ggplot2",dep=TRUE))
+if (!require("knitr",character.only = TRUE)) (install.packages("knitr",dep=TRUE))
+if (!require("xtable",character.only = TRUE)) (install.packages("xtable",dep=TRUE))
+if (!require("dplyr",character.only = TRUE)) (install.packages("dplyr",dep=TRUE))
+if (!require("stringr",character.only = TRUE)) (install.packages("stringr",dep=TRUE))
+library(ggplot2)
+library(knitr)
+library(xtable)
+library(dplyr)
+library(stringr)
+library(tidyverse)
+library(dplyr)
+library(ROCR)
+library(Hmisc)
+library(corrplot)
+library(MASS)
+library(caret)
+library(data.table)
+require(data.table)
+require(car)
+require(corrgram)
+require(ggplot2)
+```
+
+ DATA 621 – Business Analytics and Data Mining
+
+# Overview 
+
+**Homework #3 Assignment Requirements **  
+
+In this homework assignment, we will explore, analyze and model a data set containing information on crime 
+for various neighborhoods of a major city. Each record has a response variable indicating whether or not the crime 
+rate is above the median crime rate (1) or not (0). 
+ 
+Our  objective  is  to  build  a  binary  logistic  regression  model  on  the  training  data  set  to  predict  whether  the 
+neighborhood  will  be  at  risk  for  high  crime  levels.  We  will  provide  classifications  and  probabilities  for  the 
+evaluation data  set using  our  binary  logistic  regression  model.  We can only  use  the  variables  given  to us, as well as variables we derive from those. Below is a short description of the variables provided.  
+
+- **zn**:     proportion of residential  land zoned for large lots
+- **indus**:  proportion of non-retail business acres
+- **chas**:   binary indicator of whether the area borders the river
+- **nox**:    a measurement of nitric oxide in the area
+- **rm**:     average number of rooms per dwelling
+- **age**:    proportion of owner-occupied units built pre-1940
+- **dis**:    weighted distance to 5 employment centers
+- **rad**:    index of accessibility to radial highways
+- **tax**:    property tax rate
+- **ptratio**: pupil/teacher ratio
+- **lstat**:  % of the population with "lower status"
+- **medv**:   median value of owner-occupied homes
+- **target**: binary indicator of whether the crime rate is above the median
+
+
+#### Load the datasets  
+
+```{r libraries & reading data}
+crime_eval_df <- read.csv("https://raw.githubusercontent.com/johnm1990/DATA621/main/hw3/crime-evaluation-data_modified.csv")
+crime_train_df <- read.csv("https://raw.githubusercontent.com/johnm1990/DATA621/main/hw3/crime-training-data_modified.csv")
+```
+
+
+
+## 1.  Data Exploration
+
+We are working with two datasets derived from the Boston dataset: a training dataset with 466 observations of 13 variables and an evaluation dataset with 40 observations of 12 variables. The training data includes a variable for "target", the target variable that the evaluation data set will be used to predict. We begin by exploring the data in order to best understand potential relationships between the independent and dependent variables, which variables are realistic, which variables are normally distributed or require some type of transformation to meet regression assumptions, and which variables have missing observations. First, we examine each variable’s summary statistics: their minimum and maximum values, the median and mean, and the first and third quartile values. 
+
+
+```{r}
+###summary statistics
+summary(crime_train_df)
+```
+None of the variables have null values, but it's possible that null and unknown values are coded in as zeros. Of the variables with 0 as their minimum observation, both **chas** and **target** are binary coded. The first predictor, **zn**, has a median of 0 and a max of 100.  339 **zn** observations are 0. If we had contextual experience with this area's land zoning, we would be able to gauge whether that’s realistic or not, but regardless we'll need to deal with unusual distributions like **zn** in the following section, in order to include them in a linear model. When looking at maximum values, **rm**, **age**, and **rad** are interesting to call out. **rm** has a maximum value of 8.8, meaning that some suburbs have an average of 8.8 rooms per dwelling. **age**, with a max of 100, shows us that at least one suburb's owner-occupied units were all built prior to 1940. **rad** is an index of accessibility to radial highways. In the training set, we see the index spans between 1 and 24, which we can assume are discrete, ordinal values because of the nature of the index (a larger index value indicates greater access). Examining the count of values in “rad”, 17 observations have a rank of 1, while 121 observations have a rank of 24.
+
+We'll look at how to deal with odd distributions of predictors in the next section, but for now we'll continue with some summary EDA statistics, to get a better overview of things.  For instance, how are the variables correlated?
+
+```{r}
+##correlation matrix
+crime_train_df.rcorr = rcorr(as.matrix(crime_train_df))
+crime_train_df.rcorr
+```
+
+The p-values for **chas** are high, and its correlations are weak.  
+Below is the same correlation matrix, in a graphical form that's easier to grasp:  
+
+```{r}
+crime_train_df.cor = cor(crime_train_df)
+corrplot(crime_train_df.cor)
+```
+
+We need to explore the variable distributions in order to prepare the data for modeling. **lstat**, a socioeconomic indicator, is a percentage, meaning it’s already scaled and might work best in its original form. Here's its distribution:  
+
+```{r}
+ggplot(data = crime_train_df, mapping = aes(lstat)) + 
+  geom_histogram(aes(y=..density..),fill="bisque",color="white",alpha=0.7,bins=30) + 
+  geom_density() + geom_rug() + labs(x='lstat') + theme_minimal()
+```
+
+
+Both **medv** and **rm** are also relatively normally distributed and might be left alone for modeling. The other variables violate regression assumptions and should perform better when transformed.  
+
+```{r}
+ggplot(data = crime_train_df, mapping = aes(rm)) + 
+  geom_histogram(aes(y=..density..),fill="bisque",color="white",alpha=0.7,bins=30) + 
+  geom_density() + geom_rug() + labs(x='rm') + theme_minimal()
+```
+
+```{r}
+ggplot(data = crime_train_df, mapping = aes(medv)) + 
+  geom_histogram(aes(y=..density..),fill="bisque",color="white",alpha=0.7,bins=30) + 
+  geom_density() + geom_rug() + labs(x='medv') + theme_minimal()
+```
+The unusally high bar at the right of this **medv** distribution may warrant further attention.
+
+Another part of our exploration involves examining correlation between variables because multicollinearity can pose challenges for regression models. The **dis** variable, a weighted mean of distances to five Boston employment centers, is strongly negatively correlated with **indus**, **age**, and the target variable (-0.618). **medv** and **lstat** are also negatively correlated, meaning that as the median value of owner-occupied homes increases, the percentage of the population at a lower socioeconomic status decreases. In the other direction, **nox**, the nitric oxides concentration, has strong positive correlations with **indus**, **age**, and **target** (0.726). **lstat** also has strong positive correlations with **indus** and **age**, while the average number of rooms per dwelling increases in suburbs with higher median values of owner-occupied homes.
+
+Since **dis** and **nox** have relatively high correlations with the target, as well as somewhat normal summary statistics, they will likely have a role in our models.
+
+```{r}
+cor_distarget <- cor.test(crime_train_df$dis, as.numeric(crime_train_df$target))
+cor_distarget
+```
+ 
+```{r}
+cor_noxtarget <- cor.test(crime_train_df$nox, as.numeric(crime_train_df$target))
+cor_noxtarget
+```
+Multicollinearity between **tax** and **rad**, as well as **lstat** and **medv**:
+
+```{r}
+cor_taxrad<- cor.test(crime_train_df$tax, crime_train_df$rad)
+cor_taxrad
+```
+
+**lstat** and **medv** are another pair of predictors with high correlation, this time negative:  
+
+
+```{r}
+cor_lstatMedv<- cor.test(crime_train_df$lstat, crime_train_df$medv)
+cor_lstatMedv
+```
+
+Now that we have a better sense of the data we’re working with, we can begin to prepare and transform the data to maximize regression performance. 
+
+## 2.  Data Preparation
+
+As we prepare to model the data, we'll take two approaches: leaving the data alone with no transformations and transforming certain variables based on their specific distributions. In this section, we’ll review the transformations we’ve experimented with, although you’ll see in the subsequent section that we do not necessarily utilize each of the variables in its transformed state. 
+
+```{r}
+# transform target to a factor, for modeling
+crime_train_df$target <-  as.factor(crime_train_df$target)
+```
+
+We'll go variable by variable, inspecting what looked strange during EDA, and attempting to make use of or transform the irregularities.  First up is **zn**, which had 0 median and 100 max, as noted earlier.
+
+```{r}
+hist(crime_train_df$zn)
+```
+
+How do those values break down based on the response?
+
+```{r}
+boxplot(crime_train_df$zn ~ crime_train_df$target)
+```
+We notice that with just 2 exceptions, if the predictor is above a very tiny value, it is always in the lower crime towns (target==0).  We know most of those low predictor values are 0, since that was the median, but let's get a finer-grained look than the histogram provided.  
+
+```{r}
+# Which values exist, below 10?
+table(crime_train_df$zn[crime_train_df$zn<10])
+```
+
+All those small **zn** values are zero.  What is the distribution of non-zero values?  
+
+
+```{r}
+hist(crime_train_df$zn[crime_train_df$zn>0], breaks=20)
+```
+
+Even after removing the zeros, the distribution appears to be bimodal, perhaps.  Is there a threshold between the two modes, where the response variable becomes uniform?
+
+```{r}
+table(crime_train_df$target[crime_train_df$zn > 22])
+```
+
+Every town with high proportions of land zoned for large residential lots has lower crime.  So we'll create a dummy variable to indicate that, and hopefully that will allow the **zn** coefficient to fit to the remaining values better.  
+
+```{r}
+crime_train_df['zn_hi'] = crime_train_df$zn > 22
+```
+
+Next we look at **indus** similarly, starting with its distribution
+
+
+```{r}
+hist(crime_train_df$indus)
+```
+
+The problem with a lot of these distributions is they don't arise from some random process.  They are possibly the result of local zoning and legislative measures that create artificial clumps of data points, like the one around 20 in the **indus** chart above.  Is that just one value?
+
+```{r}
+table(crime_train_df$indus[crime_train_df$indus > 18])
+```
+
+Why would 121 different towns have exactly the same proportion of non-retail business acres?  Let's see if the responses are uniform:  
+
+```{r}
+table(crime_train_df$target[(crime_train_df$indus>18) & (crime_train_df$indus<20)])
+```
+
+```{r}
+table(crime_train_df$target[(crime_train_df$indus>20)])
+```
+
+All 149 towns between 18 and 20 on the **indus** scale have higher crime, so we'll again make a dummy indicator for that fact, hoping to free up the coefficient to focus on the less bizarre values.
+
+```{r}
+#Make a dummy indicator for 18<indus<20  
+crime_train_df['indus19'] = 1 * (crime_train_df$indus > 18 & crime_train_df$indus < 20)
+```
+
+How do the rest of the values break down along response lines?  
+
+```{r}
+boxplot(crime_train_df$indus ~ crime_train_df$target)
+```
+Other than that clump of 18-20 (1/3 of the data) at the top of the right-side IQR, the split is fairly normal, with higher industry correlating with higher crime.  
+
+Moving on now to **age**, which had skewed summary statistics. 
+
+```{r}
+boxplot(crime_train_df$age ~ crime_train_df$target)
+```
+The lower crime areas are normally distributed for age values, but skewed left for higher crime areas.  
+It's possible the model will be able to differentiate responses based on the different distributions, untransformed.
+
+Next up is **dis**, which was right-skewed in the summary, and correlated negatively with crime.
+
+```{r}
+boxplot(crime_train_df$dis ~ crime_train_df$target)
+```
+
+
+```{r}
+hist(crime_train_df$dis, breaks=50)
+```
+
+Although that predictor isn't perfectly normally distributed, by this dataset's standards, it's not far off.  The variance of the values for the lower crime areas looked smaller than that of the higher crime areas.
+
+```{r}
+paste('std.dev for higher crime areas: ', sd(crime_train_df$dis[crime_train_df$target==1]))
+paste('std.dev for lower crime areas: ', sd(crime_train_df$dis[crime_train_df$target==0]))
+```
+
+For the skew, let's check the distribution of the logarithm:  
+
+```{r}
+hist(log(crime_train_df$dis))
+```
+And if we condition that log distribution on the responses, how do the two look?  
+
+```{r}
+hist(log(crime_train_df$dis[crime_train_df$target==0]), main = 'Distribution of the Log of dis, for lower crime areas')
+```
+```{r}
+hist(log(crime_train_df$dis[crime_train_df$target==1]), main = 'Distribution of the Log of dis, for higher crime areas')
+```
+Taking the log normalizes the predictor conditioned on the response, so log_dis should be useful.
+
+```{r}
+crime_train_df['log_dis'] = log(crime_train_df$dis)
+```
+
+
+The next variable is **rad**, which was positively correlated with crime but oddly distributed.  
+
+```{r}
+hist(crime_train_df$rad, breaks=20)
+```
+
+See how the responses split: 
+
+```{r}
+boxplot(crime_train_df$rad ~ crime_train_df$target)
+```
+Are the responses uniform based on predictor range, since there are two distinct ranges? 
+
+```{r}
+table(crime_train_df$target[crime_train_df$rad>15])
+```
+
+Uniformly high crime areas, for the high **rad** values.  But are those just the same 121 towns that we already flagged with the **indus19** dummy variable we created earlier?
+
+```{r}
+mean(crime_train_df$indus19[crime_train_df$rad>15])
+```
+
+Yes, that's redundant information.  What about at the lower end of the **rad** range? 
+
+```{r}
+boxplot(crime_train_df$rad[crime_train_df$rad<15] ~ crime_train_df$target[crime_train_df$rad<15])
+```
+Is there a threshold below which every **rad** value corresponds to a 0 in **indus19**?  Because if so, we can let the other dummy be responsible for those **rad** values and flag everything in between.
+
+```{r}
+mean(crime_train_df$indus19[crime_train_df$rad<5])
+```
+
+Now we know that the only **rad** values that aren't redundant with **indus19** are those between 5 and 15, or 5 and 8, more specifically.
+
+```{r}
+crime_train_df['rad5to8'] = 5 < crime_train_df$rad & crime_train_df$rad < 8
+```
+
+How about **tax**, which correlated positively with crime?  
+
+```{r}
+boxplot(crime_train_df$tax ~ crime_train_df$target)
+```
+
+```{r}
+sd(crime_train_df$tax[crime_train_df$target==1])
+sd(crime_train_df$tax[crime_train_df$target==0])
+```
+
+Very different variances.
+
+```{r}
+hist(crime_train_df$tax)
+```
+
+That looks like those same 121 towns, near the right of that chart.  what are the exact values involved here?  
+
+```{r}
+table(crime_train_df$tax[crime_train_df$tax>600])
+```
+
+And are the 666 values the same towns as before?
+
+```{r}
+table(crime_train_df$target[crime_train_df$tax == 666])
+sum(crime_train_df$tax==666 & crime_train_df$indus19)
+```
+
+Yes, the same towns again.  Strange they chose 666 as the tax value per $10K, but people get angry about taxes. Or perhaps this is a proxy value for missing data. Whatever the reason, we'll make a flag for those.  
+
+```{r}
+crime_train_df['tax_666'] = crime_train_df$tax==666
+```
+
+We'll test the logarithmic transform with **tax** as well.
+
+```{r}
+crime_train_df['log_tax'] = log(crime_train_df$tax)
+```
+
+**ptratio** is next:  
+
+```{r}
+hist(crime_train_df$ptratio)
+```
+
+That clump of values around 21 should be inspected.
+
+```{r}
+table(crime_train_df$ptratio[crime_train_df$ptratio>19])
+```
+
+Check the responses at 20.2
+
+```{r}
+table(crime_train_df$target[crime_train_df$ptratio==20.2])
+```
+
+```{r}
+sum(crime_train_df$ptratio==20.2 & crime_train_df$indus19==1)
+```
+
+Now it's harder, because those same 121 towns have a **ptratio** that's shared by 7 other towns in the other half of the crime split.  The best we can do is to flag that value here, let **indus19** handle the high crime towns, and hope that the other predictors will correctly classify the 7 lower crime towns at that value.  We add the logarithmic transform here as well.
+
+```{r}
+crime_train_df['pt_peak'] = crime_train_df$ptratio == 20.2
+crime_train_df['log_ptrat'] = log(crime_train_df$ptratio)
+```
+
+**lstat**:  
+
+```{r}
+hist(crime_train_df$lstat, breaks=20)
+```
+We'll try the logarithmic transform here again, to handle skew.
+
+```{r}
+crime_train_df['log_lstat'] = log(crime_train_df$lstat)
+```
+
+Here's the full list of our variables at this point:  
+
+```{r}
+names(crime_train_df)
+```
+
+
+## 3. Build the Models 
+
+We'll set aside 10% of the data as a validation check on our models.  Although the proper way to do this would have been to split it off before transforming the data, especially when we used specific thresholds to create dummy variables, the fact is that the transforms would still be the same, as we didn't learn any new information from the validation data.  The 121 towns that showed up as a bloc in several variables would instead have been 109 towns or so, but it wouldn't have changed any decisions for transformations or threshold points.  
+
+```{r}
+set.seed(123)
+split <- caret::createDataPartition(crime_train_df$target, p=0.90, list=FALSE)
+train <- crime_train_df[split, ]
+validation <- crime_train_df[ -split, ]
+```
+
+
+### Model 1: Create a full model from the original, untransformed predictors  
+
+For our first model, we chose to include all the variables as is, without transformation to get a first look at our data and how the variables predict our outcome of interest while controlling for other predictors. We modeled our outcome as having ‘Higher Crime Rate’ based on the median crime rate without any kind of transformations.  
+
+Throughout this process, we'll use AIC as an important metric to judge the fit of our models.  Akaike Information Criterion (AIC) is a way of scoring a model based on its log-likelihood and complexity. AIC is a method for scoring and selecting a model. It is named for the developer of the method, Hirotugu Akaike, and may be shown to have a basis in information theory and frequentist-based inference.The AIC statistic is defined for logistic regression as follows AIC = -2/N * LL + 2 * k/N where N is the number of examples in the training dataset, LL is the log-likelihood of the model on the training dataset, and k is the number of parameters in the model. We prefer the model with the lowest AIC in general, but the AIC statistic penalizes complex models less than other measures such as BIC, meaning that it may put more emphasis on model performance on the training dataset, and, in turn, select more complex models.
+
+
+```{r}
+mod_1  <- glm(target ~ . - zn_hi - indus19 - log_dis - rad5to8 - tax_666 - log_tax -
+                pt_peak - log_ptrat - log_lstat, data = train, family = 'binomial')
+summary(mod_1)
+```
+
+Based on the adjusted model, odds of high crime rate decrease with every unit increase in proportion of residential land zoned for large lots (Zn), while controlling for other independent variables. The proportion of non-retail business (Indus) and suburbs bordering the Charles River did not predict High Crime Rate in our adjusted model, p-value > .05. The odds of high crime rate increased exorbitantly with every unit increase in NOx (p<.05) and decreased with every unit increase in rooms/dwelling (Rm) but this relationship was not significant. Concurring with the histogram plots and other descriptive statistics, odds of high crime rate increase with unit increase in proportion of owner-occupied units built prior to 1940 (age). Higher crime rate was also significantly predicted by avg distances to five Boston employment centers (Dis) and index of accessibility to radial highways (Rad). Odds of high crime rate decreased with unit increase in full-value property-tax rate per $10,000 (Tax) but increased with higher pupil-teacher ratio by town (Ptratio). Percentage of lower status of the population was not predictive of Higher Crime Rate at p=.32. However, the odds of high crime rate increased with unit increase in median value of owner-occupied homes (in $1000s) significantly at p < .02.
+
+The AIC value for this model was 205.07. We will compare this value with our next set of models to make a final decision about the model we use to make predictions on our evaluation dataset.
+
+
+How well does Model 1 predict the validation split?
+
+```{r}
+# generating the predictors
+mod_1.pred = predict(mod_1, newdata = validation, type = 'response')
+mod_1.pred[mod_1.pred >= 0.5] <- 1
+mod_1.pred[mod_1.pred < 0.5] <- 0
+mod_1.pred = as.factor(mod_1.pred)
+#  generating the confusion matrix
+mod_1.confusion.matrix <- confusionMatrix(mod_1.pred, validation$target, mode = "everything")
+mod_1.confusion.matrix
+```
+There was just 1 false negative as far as errors on the 45 randomly held out towns.  Thus the high F-1 score of .9787, and perfect recall, and a specificity of .9545.
+
+### Model 1, part 2:  Create a model by backing out less significant predictors from Model 1  
+
+We next adapt the model using the AIC in a stepwise algorithm. The mode or direction of the stepwise search that will pass would be “backward”. The stepAIC() function performs backward model selection by starting from a "maximal" model, which is then trimmed down. We can see below that the AIC has gone down and this suggests that the maximal or full model can be improved by simply discarding few of the attributes.  
+
+```{r}
+mod_2 <- mod_1 %>% stepAIC(direction = "backward", trace = FALSE)
+summary(mod_2)
+```
+The AIC is now slightly better, reduced from 205 to 202, using fewer predictors for a more parsimonious model.
+
+How well does the slimmer version of Model 1 predict the same validation split?
+
+```{r}
+# generating the predictors
+mod_2.pred = predict(mod_2, newdata = validation, type = 'response')
+mod_2.pred[mod_2.pred >= 0.5] <- 1
+mod_2.pred[mod_2.pred < 0.5] <- 0
+mod_2.pred = as.factor(mod_2.pred)
+#  generating the confusion matrix
+mod_2.confusion.matrix <- confusionMatrix(mod_2.pred, validation$target, mode = "everything")
+mod_2.confusion.matrix
+```
+
+This slimmer version of Model 1 produces the same score on the 10% validation set.  
+
+Rather than forcing a decision on which of those models is preferable right now, we'll see how the variable transformations affect the fits.
+
+### Model 2:  Add the logarithmic transformations as predictors  
+
+```{r}
+mod_6  <- glm(target ~ . - zn_hi - indus19 - rad5to8 - tax_666 -
+                pt_peak, data = train, family = 'binomial')
+summary(mod_6)
+```
+
+The AIC has decreased significantly, from 202 to 162, by adding the 4 logarithmic transforms, all of which have significant p-values for the coefficients.  Let's remove unimportant predictors like **chas**, the way we did with Model 1, and see if the AIC drops by a similar (small) amount. We'll also remove the intercept, since it has a large coefficient, yet an insignificant p-value, so the model is using it to explain a different variable.  
+
+
+```{r}
+mod_6  <- glm(target ~ . - zn_hi - indus19 - rad5to8 - tax_666 -
+                pt_peak - 1, data = train, family = 'binomial') # removing intercept
+mod_7 <- mod_6 %>% stepAIC(direction = "backward", trace = FALSE)
+summary(mod_7)
+```
+
+That results in a lower AIC (155 vs 162).  All the logarithmic terms have signs that offset their untransformed equivalents, which makes sense, since each pair has correlating terms, that are nevertheless important to the model's fit, as shown by the better fit.  Let's see how the predictions do on the validation set:  
+
+```{r}
+# generating the predictors
+mod_7.pred = predict(mod_7, newdata = validation, type = 'response')
+mod_7.pred[mod_7.pred >= 0.5] <- 1
+mod_7.pred[mod_7.pred < 0.5] <- 0
+mod_7.pred = as.factor(mod_7.pred)
+#  generating the confusion matrix
+mod_7.confusion.matrix <- confusionMatrix(mod_7.pred, validation$target, mode = "everything")
+mod_7.confusion.matrix
+```
+Interestigly, despite the much better AIC score for Model 2, compared to model 1, there is now one false positive in addition to the one false negative.  The two main possibilities are that this model has overfit, with the addition of the log terms, or that it just happened to make one more error than an already accurate score, on this 10% of the data.
+
+Next we will add in the dummy variables we created.
+
+
+### Model 3: Add dummies, to fit a model with all our predictors
+
+
+```{r}
+mod_3  <- glm(target ~ . , data = train, family = 'binomial')
+summary(mod_3)
+```
+
+Before we even try to interpret this model, let's back out some unimportant predictors.  
+
+```{r warning=F}
+mod_3  <- glm(target ~ . , data = train, family = 'binomial')
+mod_4 <- mod_3 %>% stepAIC(direction = "backward", trace = FALSE)
+summary(mod_4)
+```
+
+This model produced the same errors as Model 1, on the validation set, with just the one false negative.  The AIC for Model 3 is 110, compared to 155 for Model 2.  But the fact that there are dummy variables that completely predict the response with 100% accuracy for large subsets of the data, such as **indus19**, is causing problems for the linear model.  We'll move onto the model selection phase to discuss how we'll make predictions for the evaluation data.
+
+## 4. Select Models
+
+Our best predictions on the validation data were from Models 1 and 3.
+Our best AIC score for an interpretable model is for Model 2, which uses the logarithmic transforms, has an AIC of 152, but makes 1 more error than the other models on the validation set.  It's AUC is .9846, as shown here:  
+
+```{r}
+p <- predict(mod_7, type = "response")
+roc_pred <- prediction(predictions = p,labels=mod_7$y)
+auc.tmp <- performance(roc_pred,"auc"); auc <- as.numeric(auc.tmp@y.values)
+auc
+#plotting roc
+roc_perf <- performance(roc_pred , "tpr" , "fpr")
+plot(roc_perf,
+     colorize = TRUE,
+     #print.cutoffs.at= seq(0,1,0.05),
+     text.adj=c(-0.2,1.7))
+```
+
+Model 3, meanwhile, uses nonlinear patterns in the data to essentially approximate a decision tree model, which is much better suited to this dataset.  The glm model using its dummy variables makes perfect use of the information handed to it, but produces hard-to-understand results.  Nevertheless, it makes good predictions, with a much lower AIC of 110, and an AUC score of .995, as shown here:  
+
+```{r}
+p <- predict(mod_4, type = "response")
+roc_pred <- prediction(predictions = p,labels=mod_4$y)
+auc.tmp <- performance(roc_pred,"auc"); auc <- as.numeric(auc.tmp@y.values)
+auc
+#plotting roc
+roc_perf <- performance(roc_pred , "tpr" , "fpr")
+plot(roc_perf,
+     colorize = TRUE,
+     #print.cutoffs.at= seq(0,1,0.05),
+     text.adj=c(-0.2,1.7))
+```
+
+
+All in all we see Model selection is the problem of choosing one from among a set of candidate models. It is common to choose a model that performs the best on a hold-out test dataset or to estimate model performance using a resampling technique, such as k-fold cross-validation. An alternative approach to model selection involves using probabilistic statistical measures that attempt to quantify both the model performance on the training dataset and the complexity of the model. One such example is AIC. The benefit of an information criterion statistic is that it does not require a hold-out test set, although a limitation is that it doesn't take the uncertainty of the model into account and may end-up leading to selecting a model that is too simple or too complex.
+
+If our goal is to make the most accurate predictions possible, we will obviously choose Model 3.  But instead, for a linear model course project, we'll use Model 2, since it's actually a linear model that makes sense, even if the dataset isn't appropriate for a linear model.  Here are our evaluation predictions for Model 2:  
+
+
+```{r}
+crime_eval_df['log_dis'] = log(crime_eval_df$dis)
+crime_eval_df['log_tax'] = log(crime_eval_df$tax)
+crime_eval_df['log_ptrat'] = log(crime_eval_df$ptratio)
+crime_eval_df['log_lstat'] = log(crime_eval_df$lstat)
+eval.pred = predict(mod_7, newdata = crime_eval_df, type = "response")
+
+probs = eval.pred
+preds = 1 * (eval.pred > .5)
+evalOutput = data.frame('Probability'=probs, 'Predictions'= preds)
+
+evalOutput
+```
+
+
+
