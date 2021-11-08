@@ -596,4 +596,7 @@ evalOutput
 ```
 
 
+## Appendix:  
+
+[Full R Code](https://github.com/ebhtra/msds-621/blob/main/HW3/HW3_Submission.Rmd)
 
