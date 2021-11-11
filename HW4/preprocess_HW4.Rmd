@@ -1,0 +1,132 @@
+---
+title: "preprocessHW4"
+author: "Team3"
+date: "11/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load datasets
+
+```{r reading data}
+ins_train_df <- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/insurance_training_data.csv")
+ins_eval_df <- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/insurance-evaluation-data.csv")
+```
+
+### inspect values
+
+```{r}
+summary(ins_train_df)
+```
+
+#### Some columns should be numbers but aren't
+
+```{r}
+ins_train_df$BLUEBOOK[1:11]
+```
+
+
+```{r}
+ins_train_df$INCOME[1:11]
+```
+
+```{r}
+ins_train_df$HOME_VAL[1:11]
+```
+
+```{r}
+ins_train_df$OLDCLAIM[1:11]
+```
+
+#### convert strings to integers, filling blanks as 0
+
+```{r}
+dollars <- function(n){
+  as.integer(paste0('0', str_remove_all(n, '[,$]')))  # add leading zero for blanks
+}
+dollars(ins_train_df$INCOME[1:11])
+```
+
+```{r}
+ins_eval_df$BLUEBOOK = dollars(ins_eval_df$BLUEBOOK)
+ins_train_df$BLUEBOOK = dollars(ins_train_df$BLUEBOOK)
+ins_eval_df$HOME_VAL = dollars(ins_eval_df$HOME_VAL)
+ins_train_df$HOME_VAL = dollars(ins_train_df$HOME_VAL)
+ins_eval_df$INCOME = dollars(ins_eval_df$INCOME)
+ins_train_df$INCOME = dollars(ins_train_df$INCOME)
+ins_eval_df$OLDCLAIM = dollars(ins_eval_df$OLDCLAIM)
+ins_train_df$OLDCLAIM = dollars(ins_train_df$OLDCLAIM)
+```
+
+#### Inspect more features
+
+```{r}
+ins_train_df$PARENT1[1:11]
+ins_train_df$MSTATUS[1:11]
+ins_train_df$SEX[1:11]
+ins_train_df$EDUCATION[1:11]
+ins_train_df$JOB[1:11]
+ins_train_df$CAR_USE[1:11]
+ins_train_df$CAR_TYPE[1:11]
+ins_train_df$REVOKED[1:11]
+ins_train_df$URBANICITY[1:11]
+ins_train_df$RED_CAR[1:11]
+```
+#### Turn boolean strings into booleans
+
+```{r}
+ins_train_df$REVOKED = tolower(ins_train_df$REVOKED)=='yes'
+ins_eval_df$REVOKED = tolower(ins_eval_df$REVOKED)=='yes'
+ins_train_df$PARENT1 = tolower(ins_train_df$PARENT1)=='yes'
+ins_eval_df$PARENT1 = tolower(ins_eval_df$PARENT1)=='yes'
+ins_train_df$RED_CAR = tolower(ins_train_df$RED_CAR)=='yes'
+ins_eval_df$RED_CAR = tolower(ins_eval_df$RED_CAR)=='yes'
+ins_train_df$MSTATUS = tolower(ins_train_df$MSTATUS)=='yes'
+ins_eval_df$MSTATUS = tolower(ins_eval_df$MSTATUS)=='yes'
+```
+
+#### Turn unordered categorical strings into unordered factors
+
+```{r}
+ins_eval_df$SEX <- factor(ins_eval_df$SEX)
+ins_train_df$SEX <- factor(ins_train_df$SEX)
+ins_eval_df$JOB <- factor(ins_eval_df$JOB)
+ins_train_df$JOB <- factor(ins_train_df$JOB)
+ins_eval_df$CAR_USE <- factor(ins_eval_df$CAR_USE)
+ins_train_df$CAR_USE <- factor(ins_train_df$CAR_USE)
+ins_eval_df$CAR_TYPE <- factor(ins_eval_df$CAR_TYPE)
+ins_train_df$CAR_TYPE <- factor(ins_train_df$CAR_TYPE)
+ins_eval_df$URBANICITY <- factor(ins_eval_df$URBANICITY)
+ins_train_df$URBANICITY <- factor(ins_train_df$URBANICITY)
+```
+
+#### Turn ordered categorical strings into ordered factors
+
+```{r}
+unique(ins_train_df$EDUCATION)
+```
+
+```{r}
+ins_eval_df$EDUCATION <- factor(ins_eval_df$EDUCATION,
+                                   levels = c("<High School", "z_High School",
+                                               "Bachelors", "Masters", "PhD"),
+                                    ordered = T)
+ins_train_df$EDUCATION <- factor(ins_train_df$EDUCATION,
+                                   levels = c("<High School", "z_High School",
+                                               "Bachelors", "Masters", "PhD"),
+                                    ordered = T)
+```
+
+```{r}
+summary(ins_train_df)
+```
+
+```{r}
+write.csv(ins_train_df, 'preprocessed_train.csv')
+write.csv(ins_eval_df, 'preprocessed_eval.csv')
+```
+
+
