@@ -3,6 +3,7 @@ title: "DATA 621 - Final Project Proposal"
 author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath, Arushi Arora"
 date: "11/07/2021"
 output:
+  pdf_document: default
   html_document: 
     toc: true
     toc-title: "DATA 621 - Final Project Proposal"
@@ -12,12 +13,10 @@ output:
       smooth_scroll: false
     theme: darkly
     highlight: pygments
-  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = F)
-
 ```
 
  DATA 621 – Business Analytics and Data Mining
@@ -26,38 +25,52 @@ knitr::opts_chunk$set(echo = TRUE, warning = F)
 # Requirements
 The final course project will be done in Group (depending on your own choice). You may choose your own topics (and teammates) by yourself. The purpose of this project is to explore, analyze and model a real-world data set of your own interest using the regression modeling techniques learned in the course.
 The real-world data set can be either:
-⦁	A data set that you have personally collected (e.g., at your workplace, internship, etc.).
-⦁	An open-source data set that you have downloaded from the Internet (e.g., CDC, NIH, NHANES, MEPS, BRFSS, Kaggle, InfoChimps, etc.).
-⦁	Textbook exercises are not suitable for course projects.
+
+- A data set that you have personally collected (e.g., at your workplace, internship, etc.).
+
+- An open-source data set that you have downloaded from the Internet (e.g., CDC, NIH, NHANES, MEPS, BRFSS, Kaggle, InfoChimps, etc.).
+
+- Textbook exercises are not suitable for course projects.
 
 You will need to develop a problem statement and research question(s) based on the data set that you have obtained. You must survey the state-of-the-art literature and research developments dealing with empirical studies, algorithms, or methodologies related to your problem. You will need to achieve two deliverables: 1) Presentation slides and 2) a final report. These deliverables will be submitted on Blackboard.
 
 
 # Abstract and Keywords
-Use 250 words or less to summarize your problem, methodology, and major outcomes.
+Using World Health Organization data on life expectancy, the authors conduct a longitudinal study using time series regression to explore the relationships between economic, health, and socioeconomic factors and longevity. The outcomes bear great significance on future improvements in investment and policy-making geared towards minimizing the discrepancies in health outcomes globally.
 
+Key words:
 
+- Life expectancy
 
-Key words: Select a few key words (up to five) related to your work.
-•
-•
-•
-•
-•
+- development
+
+- public health
+
+- disparities
+
+- socioeconomic factors
 
 # Introduction
-Describe the background and motivation of your problem.
+Working with health and development indicators at the country level allows us to better understand disparities in public health and health outcomes. Understanding these disparities allows us to influence and better direct investment, guide policy implementation, and directly address the disparities, improving health and wellbeing particularly in areas that experience the lowest quality of life. In this project, we’ll work with the World Health Organization dataset hosted by Kaggle (“Life Expectancy (WHO) Statistical Analysis on Factors Influencing Life Expectancy”). It includes data on 193 countries over the span of 15 years, between 2000 and 2015, with a total of 2,938 observations across 22 variables. The variables include country descriptors, financial development, health, and education indicators. Within this dataset, we are primarily focused on life expectancy. We’ll conduct a longitudinal study exploring changes in life expectancy over time by geographic region. In the following paragraphs, we’ll briefly introduce and review prominent related literature and our research methodology.
 
 
 # Literature Review and Methodology
-Discuss how other researchers have addressed similar problems, what their achievements are, and what the advantage and drawbacks of each    reviewed
+As briefly introduced above, there are myriad incentives to conduct studies on life expectancy. Luckily, because the interest has been present for so long, there are innumerable studies exploring the topic. Systematic review of all the literature finds a general consensus across studies on the significant association between life expectancy and several sociodemographic, macroeconomic, and health care variables (Wirayuda and Chan). In one such study, a cross-country structural equation model was used with observations for Singapore, Malaysia, and Thailand from the period 1980-2008, with life expectancy as the dependent variable. Demographics, socioeconomic status, and health care were used as predictor variables, with the authors recommending that more investment in healthcare coverage is needed to alleviate regional discrepancies in the overall health status of people within these three countries (Chan and Devi). In another study, authors used a non-parametric cointegration test and a multivariate Granger causality test to explore the factors affecting the life expectancy in 16 sub-saharan countries between 1970-2012. This study’s analysis indicates that certain economic variables, like financial development, globalisation and economic growth, have a positive relationship with life expectancy in most sub-Saharan African countries (Shahbaz and Shafiullah). It is also quite common for studies to use and integrate demographic methods to explore life expectancy (itself a demographic variable). For example, Dwyer-Lindgren and Bertozzi-Villa constructed US county-level life charts before using principal component analysis and ordinary least squares regression to identify county-level associations between life expectancy and selected independent variables, such as socioeconomic and race/ethnicity factors, behavioral and metabolic risk factors, and health care factors (Dwyer-Lindgren and Bertozzi-Villa). Across studies, it was found that the literacy rate, infant mortality rate, education levels, socioeconomic status, population growth, and gender inequality have significant relationships with life expectancy (Wirayuda and Chan).  Macroeconomic factors with significant correlations to life expectancy include gross domestic product, Gini, income level, unemployment rate, and inflation rate (Wirayuda and Chan). However, one aspect that merits more attention in the literature is longitudinal studies to examine the impact of changes in conditions over time on the outcome of longevity.
 
-approach are. Explain how your investigation is similar or different to the state-of-the- art. Please cite the relevant papers where appropriate.
+In this project, we’re examining variables and their relationships to life expectancy over time, in the hopes of finding the variables that best predict life expectancy in order to inform the question of, which are the most effective interventions to increase life expectancies and where? We’ll work with time series regression which provides us the opportunity to evaluate trends in variables and trends in their relationships. Time series is also valuable in that it addresses the lack of independence, a key assumption in regression, present in variable observations for countries in adjacent years. Because of the nature of the data, missingness and bias are two challenges we will have to navigate. Developed countries with more infrastructure tend to have greater access to the resources to collect, track, and record large amounts of data over time, whereas countries experiencing debilitating conflict or crises are more likely to prioritize the expenditure of their resources elsewhere. Because real-life data is not perfect, we aim to work with the data that is present as much as we can, creatively categorizing and engineering the data in such a way to maximize the balance between model fit and generalization. With so many having studied and worked with this data to shed insight on global life expectancy discrepancies, we will be happy to contribute well-made models with creatively engineered variables that move the life expectancy conversation forward.
 
 
-# References and Appendices: 
-Be sure to cite all references used in the report (APA format).
 
+# References
+Life Expectancy (WHO) Statistical Analysis on factors influencing Life Expectancy. https://www.kaggle.com/kumarajarshi/life-expectancy-who
+
+Chan, & Kamala Devi, M. (2015). Factors Affecting Life Expectancy: Evidence From 1980-2009    Data in Singapore, Malaysia, and Thailand. Asia-Pacific Journal of Public Health, 27(2), 136–146. https://doi.org/10.1177/1010539512454163
+
+Wirayuda, & Chan, M. F. (2021). A Systematic Review of Sociodemographic, Macroeconomic, and Health Resources Factors on Life Expectancy. Asia Pacific Journal of Public Health, 33(4), 335–356. https://doi.org/10.1177/1010539520983671
+
+Shahbaz, Shafiullah, M., & Mahalik, M. K. (2019). The dynamics of financial development, globalisation, economic growth and life expectancy in sub‐Saharan Africa. Australian Economic Papers, 58(4), 444–479. https://doi.org/10.1111/1467-8454.12163
+
+Dwyer-Lindgren, Bertozzi-Villa, A., Stubbs, R. W., Morozoff, C., Mackenbach, J. P., van Lenthe, F. J., Mokdad, A. H., & Murray, C. J. L. (2017). Inequalities in Life Expectancy Among US Counties, 1980 to 2014: Temporal Trends and Key Drivers. JAMA Internal Medicine, 177(7), 1003–1011. https://doi.org/10.1001/jamainternmed.2017.0918
 
 
 
