@@ -42,13 +42,6 @@ require(corrgram)
 require(ggplot2)
 ```
 
-
-```{r reading data}
-ins_train_df <- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/insurance_training_data.csv")
-ins_eval_df <- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/insurance-evaluation-data.csv")
-```
-
-
  DATA 621 – Business Analytics and Data Mining
  
 
@@ -92,15 +85,229 @@ provided).
 - **YOJ**: Years on Job People who stay at a job for a long time are usually more safe
 
 # DATA EXPLORATION
-```{r}
-head(ins_train_df)
-summary(ins_train_df)
-```
+Describe the size and the variables in the  insurance training data set. Consider that too much detail will cause a 
+manager to lose interest while too little detail will make the manager consider that you aren’t doing your job. Some 
+suggestions are given below. Please do NOT treat this as a check list of things to do to complete the assignment. 
+You should have your own thoughts on what to tell the boss. These are just ideas. 
+a. Mean / Standard Deviation / Median 
+b. Bar Chart or Box Plot of the data 
+c. Is the data correlated to the target variable (or to other variables?) 
+d. Are any of the variables missing and need to be imputed “fixed”?
+
+
+
 
 
 # DATA PREPARATION
+Describe how you have transformed the data by changing the original variables or creating new variables. If you 
+did transform the data or create new variables, discuss why you did this. Here are some possible transformations. 
+ 
+a. Fix missing values (maybe with a Mean or Median value) 
+b. Create flags to suggest if a variable was missing 
+c. Transform data by putting it into buckets 
+d. Mathematical transforms such as log or square root (or use Box-Cox) 
+e. Combine variables (such as ratios or adding or multiplying) to create new variables
+
+### Load datasets
+
+```{r reading data}
+ins_train_df <- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/insurance_training_data.csv")
+ins_eval_df <- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/insurance-evaluation-data.csv")
+```
+
+### inspect values
+
+```{r}
+summary(ins_train_df)
+```
+
+```{r}
+#before whole list of columns telling class, now showing measure
+
+ins_train_df <- as.data.frame(lapply(ins_train_df, gsub, pattern='z_', replacement=''))
+ins_eval_df <- as.data.frame(lapply(ins_eval_df, gsub, pattern='z_', replacement=''))
+cols.num <- c("TARGET_FLAG",
+"TARGET_AMT",
+"AGE",
+"YOJ",
+"TRAVTIME",
+"TIF",
+"CLM_FREQ",
+"MVR_PTS",
+"CAR_AGE",
+"KIDSDRIV",
+"HOMEKIDS"
+)
+ins_train_df[cols.num] <- sapply(ins_train_df[cols.num],as.numeric)
+ins_eval_df[cols.num] <- sapply(ins_eval_df[cols.num],as.numeric)
+
+
+#do not need, the function already handled
+#ins_train_df <- lapply(ins_train_df, gsub, pattern='$', replacement='')
+#ins_eval_df <- lapply(ins_eval_df, gsub, pattern='$', replacement='')
+
+#ins_train_df <- lapply(ins_train_df, gsub, pattern=',', replacement='')
+#ins_eval_df <- lapply(ins_eval_df, gsub, pattern=',', replacement='')
+
+ins_eval_df$SEX <- factor(ins_eval_df$SEX)
+ins_train_df$SEX <- factor(ins_train_df$SEX)
+ins_eval_df$JOB <- factor(ins_eval_df$JOB)
+ins_train_df$JOB <- factor(ins_train_df$JOB)
+ins_eval_df$CAR_USE <- factor(ins_eval_df$CAR_USE)
+ins_train_df$CAR_USE <- factor(ins_train_df$CAR_USE)
+ins_eval_df$CAR_TYPE <- factor(ins_eval_df$CAR_TYPE)
+ins_train_df$CAR_TYPE <- factor(ins_train_df$CAR_TYPE)
+ins_eval_df$URBANICITY <- factor(ins_eval_df$URBANICITY)
+ins_train_df$URBANICITY <- factor(ins_train_df$URBANICITY)
+
+ins_eval_df$EDUCATION <- factor(ins_eval_df$EDUCATION,
+                                   levels = c("<High School", "High School",
+                                               "Bachelors", "Masters", "PhD"),
+                                    ordered = T)
+ins_train_df$EDUCATION <- factor(ins_train_df$EDUCATION,
+                                   levels = c("<High School", "High School",
+                                               "Bachelors", "Masters", "PhD"),
+                                    ordered = T)
+```
+
+
+
+#### Some columns should be numbers but aren't
+
+```{r}
+#print first six values
+head(ins_train_df$BLUEBOOK)
+typeof(ins_train_df$BLUEBOOK)
+```
+
+
+```{r}
+head(ins_train_df$INCOME)
+typeof(ins_train_df$INCOME)
+```
+
+```{r}
+head(ins_train_df$HOME_VAL)
+typeof(ins_train_df$HOME_VAL)
+```
+
+```{r}
+head(ins_train_df$OLDCLAIM)
+typeof(ins_train_df$OLDCLAIM)
+```
+
+#### convert strings to integers, filling blanks as 0
+
+#need to check for decimals, convert to integer.No decimals.
+```{r}
+
+head(ins_train_df$INCOME)
+
+#change it to as.numeric from original (as.integer) ***overwrites existing character type
+dollars <- function(n){
+  as.numeric(paste0('0', str_remove_all(n, '[,$]')))  # add leading zero for blanks
+}
+dollars(ins_train_df$INCOME[1:11])
+```
+
+```{r}
+#converting to dollars of blue blook
+
+ins_eval_df$BLUEBOOK = dollars(ins_eval_df$BLUEBOOK)
+ins_train_df$BLUEBOOK = dollars(ins_train_df$BLUEBOOK)
+ins_eval_df$HOME_VAL = dollars(ins_eval_df$HOME_VAL)
+ins_train_df$HOME_VAL = dollars(ins_train_df$HOME_VAL)
+ins_eval_df$INCOME = dollars(ins_eval_df$INCOME)
+ins_train_df$INCOME = dollars(ins_train_df$INCOME)
+ins_eval_df$OLDCLAIM = dollars(ins_eval_df$OLDCLAIM)
+ins_train_df$OLDCLAIM = dollars(ins_train_df$OLDCLAIM)
+```
+
+#### Inspect more features
+
+```{r}
+#change to head
+ins_train_df$PARENT1[1:11]
+ins_train_df$MSTATUS[1:11]
+ins_train_df$SEX[1:11]
+ins_train_df$EDUCATION[1:11]
+ins_train_df$JOB[1:11]
+ins_train_df$CAR_USE[1:11]
+ins_train_df$CAR_TYPE[1:11]
+ins_train_df$REVOKED[1:11]
+ins_train_df$URBANICITY[1:11]
+ins_train_df$RED_CAR[1:11]
+
+table(ins_train_df$URBANICITY)
+```
+#### Turn boolean strings into booleans
+
+```{r}
+#not necessary
+#changes to logical type
+
+table(ins_train_df$REVOKED)
+
+ins_train_df$REVOKED = tolower(ins_train_df$REVOKED)=='yes'
+ins_eval_df$REVOKED = tolower(ins_eval_df$REVOKED)=='yes'
+ins_train_df$PARENT1 = tolower(ins_train_df$PARENT1)=='yes'
+ins_eval_df$PARENT1 = tolower(ins_eval_df$PARENT1)=='yes'
+ins_train_df$RED_CAR = tolower(ins_train_df$RED_CAR)=='yes'
+ins_eval_df$RED_CAR = tolower(ins_eval_df$RED_CAR)=='yes'
+ins_train_df$MSTATUS = tolower(ins_train_df$MSTATUS)=='yes'
+ins_eval_df$MSTATUS = tolower(ins_eval_df$MSTATUS)=='yes'
+```
+
+
+
+```{r}
+summary(ins_train_df)
+ins_train_df$INCOME <- as.numeric(ins_train_df$INCOME)
+typeof(ins_train_df$INCOME)
+head(ins_train_df$INCOME)
+```
+
+
+
+
+
+
+```{r}
+#x include all numeric column
+#summaries for mean
+#y %>% 
+#             group_by(hour) %>% 
+#             mutate(profit= ifelse(is.na(profit), mean(profit, na.rm=TRUE), profit))
+x <- ins_train_df %>% 
+  dplyr::select(where(is.numeric))
+kable(sapply(x, function(x) c( "Stand dev" = sd(x), 
+                         "Mean"= mean(x,na.rm=TRUE),
+                         "n" = length(x),
+                         "Median" = median(x,na.rm = TRUE),
+                         "CoeffofVariation" = sd(x)/mean(x,na.rm=TRUE),
+                         "Minimum" = min(x),
+                         "Maximun" = max(x),
+                         "Upper Quantile" = quantile(x,1,na.rm = TRUE),
+                         "LowerQuartile" = quantile(x,0,na.rm = TRUE)
+                    )
+)
+)
+
+```
+
+
+### BRAINSTORM
+
+
+
+
 
 # BUILD MODELS 
+
+
+
+
+
 
 # SELECT MODELS
 
