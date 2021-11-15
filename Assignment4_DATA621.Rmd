@@ -23,6 +23,10 @@ if (!require("xtable",character.only = TRUE)) (install.packages("xtable",dep=TRU
 if (!require("dplyr",character.only = TRUE)) (install.packages("dplyr",dep=TRUE))
 if (!require("stringr",character.only = TRUE)) (install.packages("stringr",dep=TRUE))
 if (!require("Hmisc",character.only = TRUE)) (install.packages("Hmisc",dep=TRUE))
+if (!require("ClusterR",character.only = TRUE)) (install.packages("ClusterR",dep=TRUE))
+if (!require("cluster",character.only = TRUE)) (install.packages("cluster",dep=TRUE))
+if (!require("lattice",character.only = TRUE)) (install.packages("lattice",dep=TRUE))
+
 library(ggplot2)
 library(knitr)
 library(xtable)
@@ -35,11 +39,15 @@ library(Hmisc)
 library(corrplot)
 library(MASS)
 library(caret)
+library(tidyr)
 library(data.table)
 require(data.table)
 require(car)
 require(corrgram)
 require(ggplot2)
+library(ClusterR)
+library(cluster)
+library(lattice)
 ```
 
  DATA 621 – Business Analytics and Data Mining
@@ -84,7 +92,7 @@ provided).
 - **URBANICITY**: Home/Work Area Unknown
 - **YOJ**: Years on Job People who stay at a job for a long time are usually more safe
 
-# DATA EXPLORATION
+## 1. Data Exploration
 Describe the size and the variables in the  insurance training data set. Consider that too much detail will cause a 
 manager to lose interest while too little detail will make the manager consider that you aren’t doing your job. Some 
 suggestions are given below. Please do NOT treat this as a check list of things to do to complete the assignment. 
@@ -98,7 +106,7 @@ d. Are any of the variables missing and need to be imputed “fixed”?
 
 
 
-# DATA PREPARATION
+## 2. Data Preparation
 Describe how you have transformed the data by changing the original variables or creating new variables. If you 
 did transform the data or create new variables, discuss why you did this. Here are some possible transformations. 
  
@@ -127,19 +135,16 @@ summary(ins_train_df)
 ins_train_df <- as.data.frame(lapply(ins_train_df, gsub, pattern='z_', replacement=''))
 ins_eval_df <- as.data.frame(lapply(ins_eval_df, gsub, pattern='z_', replacement=''))
 cols.num <- c("TARGET_FLAG",
-"TARGET_AMT",
-"AGE",
-"YOJ",
-"TRAVTIME",
-"TIF",
-"CLM_FREQ",
-"MVR_PTS",
-"CAR_AGE",
-"KIDSDRIV",
-"HOMEKIDS"
-)
+"TARGET_AMT","AGE","YOJ","TRAVTIME","TIF","CLM_FREQ",
+"MVR_PTS","CAR_AGE","KIDSDRIV","HOMEKIDS")
+
 ins_train_df[cols.num] <- sapply(ins_train_df[cols.num],as.numeric)
 ins_eval_df[cols.num] <- sapply(ins_eval_df[cols.num],as.numeric)
+
+cols.fac <- c("EDUCATION", "SEX", "CAR_TYPE", "JOB", "CAR_USE", "URBANICITY")
+
+ins_train_df[cols.fac] <- sapply(ins_train_df[cols.fac],factor)
+ins_eval_df[cols.fac] <- sapply(ins_eval_df[cols.fac],factor)
 
 
 #do not need, the function already handled
@@ -199,6 +204,7 @@ typeof(ins_train_df$OLDCLAIM)
 #### convert strings to integers, filling blanks as 0
 
 #need to check for decimals, convert to integer.No decimals.
+#these four variables need to add them to ins_train_numeric
 ```{r}
 
 head(ins_train_df$INCOME)
@@ -273,22 +279,22 @@ head(ins_train_df$INCOME)
 
 
 ```{r}
-#x include all numeric column
+#x include all numeric column **leave until we see correlation
 #summaries for mean
-#y %>% 
-#             group_by(hour) %>% 
-#             mutate(profit= ifelse(is.na(profit), mean(profit, na.rm=TRUE), profit))
-x <- ins_train_df %>% 
+
+ins_train_numeric <- ins_train_df %>% 
   dplyr::select(where(is.numeric))
-kable(sapply(x, function(x) c( "Stand dev" = sd(x), 
-                         "Mean"= mean(x,na.rm=TRUE),
-                         "n" = length(x),
-                         "Median" = median(x,na.rm = TRUE),
-                         "CoeffofVariation" = sd(x)/mean(x,na.rm=TRUE),
-                         "Minimum" = min(x),
-                         "Maximun" = max(x),
-                         "Upper Quantile" = quantile(x,1,na.rm = TRUE),
-                         "LowerQuartile" = quantile(x,0,na.rm = TRUE)
+#we will see what type of variable they are with str
+str(ins_train_df)
+kable(sapply(ins_train_numeric, function(ins_train_numeric) c( "Stand dev" = sd(ins_train_numeric), 
+                         "Mean"= mean(ins_train_numeric,na.rm=TRUE),
+                         "n" = length(ins_train_numeric),
+                         "Median" = median(ins_train_numeric,na.rm = TRUE),
+                         "CoeffofVariation" = sd(ins_train_numeric)/mean(ins_train_numeric,na.rm=TRUE),
+                         "Minimum" = min(ins_train_numeric),
+                         "Maximum" = max(ins_train_numeric),
+                         "Upper Quantile" = quantile(ins_train_numeric,1,na.rm = TRUE),
+                         "LowerQuartile" = quantile(ins_train_numeric,0,na.rm = TRUE)
                     )
 )
 )
@@ -296,21 +302,154 @@ kable(sapply(x, function(x) c( "Stand dev" = sd(x),
 ```
 
 
-### BRAINSTORM
+
+```{r}
+###summary statistics
+#ignore all missing values, provides our SD for all numeric
+summary(ins_train_df)
+sapply(ins_train_numeric, sd, na.rm=TRUE)
+#####sapply(ins_train_numeric, hist, na.rm=TRUE)
+
+ins_train_numeric %>% gather() %>% head()
+
+ggplot(gather(ins_train_numeric), aes(value)) + 
+    geom_histogram(bins = 10) + 
+    facet_wrap(~key, scales = 'free_x')
+#have a deeper look, potentially need to transform, huge variance
+hist(ins_train_df$TARGET_AMT)
+summary(ins_train_df$TARGET_AMT)
+var(ins_train_df$TARGET_AMT)
+var(log(ins_train_df$TARGET_AMT+1))
+#benefit of log transform, 
+#we added because there a lot of 0's in Target_AMT, we added 1
+
+#log of 0 undefined, thats why 0, need to find a better transformation that handles zeros well
+
+#have a deeper look, potentially need to transform, huge variance
+hist(ins_train_df$INCOME)
+summary(ins_train_df$INCOME)
+var(ins_train_df$INCOME)
+var(log(ins_train_df$INCOME+1))
+#table(ins_train_df$INCOME)
+
+#have a deeper look, potentially need to transform, huge variance (extremely compressed)
+#important to note log0 is undefinded, in order to transform needed to change to 1
+#age, yoj,car_age many misssing values
+#we are focusing on the ones with missing values first
+
+hist(ins_train_df$OLDCLAIM)
+summary(ins_train_df$OLDCLAIM)
+var(ins_train_df$OLDCLAIM)
+var(log(ins_train_df$OLDCLAIM+1))
+#table(ins_train_df$OLDCLAIM)
+
+summary(ins_train_df)
+
+# ggplot(gather(ins_train_numeric, cols, value), aes(x = value)) + 
+#        geom_histogram(binwidth = 20) + facet_grid(.~cols)
+
+
+##correlation matrix
+ins_train_numeric.rcorr = rcorr(as.matrix(ins_train_numeric))
+ins_train_numeric.rcorr
+
+#a lot of NA's for the three variables, Correlation take all values in the column and associate them
+
+ins_train_numeric.cor = cor(ins_train_numeric, use = "complete.obs")
+corrplot(ins_train_numeric.cor)
+
+
+#homekids looks like good group for imputing ages
+#table(ins_train_df$HOMEKIDS)
+#incoming needs to be clustered for imputing
+
+
+
+#create five clusters of income
+kmeans.re <- kmeans(ins_train_df$INCOME, centers = 5)
+table(kmeans.re$cluster)
+ins_train_df$inc_clusters <- kmeans.re$cluster
+#table(ins_train_df$INCOME)
+
+#we are creating groups based on homekids, replace missing value
+ins_train_df <- ins_train_df %>% 
+             group_by(HOMEKIDS) %>% 
+            mutate(AGE= ifelse(is.na(AGE), mean(AGE, na.rm=TRUE), AGE))
+
+
+#we are creating groups based on car_age, replace missing value
+ins_train_df <- ins_train_df %>% 
+             group_by(inc_clusters) %>% 
+            mutate(CAR_AGE= ifelse(is.na(CAR_AGE), mean(CAR_AGE, na.rm=TRUE), CAR_AGE))
+
+#we are creating groups based on homekids, replace missing value
+#no group value is highly correlated by YOJ
+ins_train_df <- ins_train_df %>% 
+  mutate(YOJ= ifelse(is.na(YOJ), mean(YOJ, na.rm=TRUE), YOJ))
+
+summary(ins_train_df)
+
+#correlations between variables we highly suspect
+
+cor_inctarget <- cor.test(ins_train_df$INCOME, ins_train_df$TARGET_AMT)
+cor_inctarget
+
+cor_hovaltarget <- cor.test(ins_train_df$HOME_VAL, ins_train_df$TARGET_AMT)
+cor_hovaltarget
+
+cor_cfreqtarget<- cor.test(ins_train_df$CLM_FREQ, ins_train_df$TARGET_AMT)
+cor_cfreqtarget
+
+
+cor_mptstarget<- cor.test(ins_train_df$MVR_PTS, ins_train_df$TARGET_AMT)
+cor_mptstarget
+
+cor_travtarget<- cor.test(ins_train_df$TRAVTIME, ins_train_df$TARGET_AMT)
+cor_travtarget
+#the weaker the correlation the higher the p value
+
+#ttests
+#most P values significantly low
+t_inctarget <- t.test(ins_train_df$INCOME~ ins_train_df$TARGET_FLAG)
+t_inctarget
+
+t_hovaltarget <- t.test(ins_train_df$HOME_VAL~ ins_train_df$TARGET_FLAG)
+t_hovaltarget
+
+t_cfreqtarget<- t.test(ins_train_df$CLM_FREQ~ ins_train_df$TARGET_FLAG)
+t_cfreqtarget
+
+
+t_mptstarget<- t.test(ins_train_df$MVR_PTS~ ins_train_df$TARGET_FLAG)
+t_mptstarget
+
+t_travtarget<- t.test(ins_train_df$TRAVTIME~ ins_train_df$TARGET_FLAG)
+t_travtarget
+
+#percentages is better because same scale for both graphs
+
+histogram(~ INCOME | TARGET_FLAG, data = ins_train_df)
+histogram(~ HOME_VAL | TARGET_FLAG, data = ins_train_df)
+histogram(~ CLM_FREQ | TARGET_FLAG, data = ins_train_df)
+histogram(~ MVR_PTS | TARGET_FLAG, data = ins_train_df)
+
+#checking the distribution, flag 0 means no car crashes, target 1 means car crashes, we are checking distribution of income between both
+
+```
+
+
+
+## 3. Build the Models
 
 
 
 
 
-# BUILD MODELS 
 
+## 4. Select Models
 
-
-
-
-
-# SELECT MODELS
 
 
  
+
 
