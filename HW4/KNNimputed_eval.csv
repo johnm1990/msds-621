@@ -941,7 +941,7 @@
 "940",NA,0,44,0,12,22960,FALSE,142579,TRUE,"M","z_High School","z_Blue Collar",21,"Commercial",11690,4,"Pickup",TRUE,0,0,FALSE,1,10,"Highly Urban/ Urban",FALSE,FALSE,FALSE,FALSE,FALSE
 "941",NA,0,65,0,15,5013,FALSE,107287,TRUE,"z_F","z_High School","Student",32,"Commercial",8670,1,"Sports Car",FALSE,5900,1,FALSE,8,8,"Highly Urban/ Urban",FALSE,FALSE,FALSE,FALSE,FALSE
 "942",NA,0,51,0,8,61569,FALSE,233243,TRUE,"z_F","Masters","Professional",23,"Private",30190,1,"Pickup",FALSE,0,0,FALSE,0,8,"Highly Urban/ Urban",FALSE,FALSE,FALSE,FALSE,FALSE
-"943",NA,0,NA,0,9,14484,FALSE,0,FALSE,"z_F","<High School","Clerical",20,"Private",2950,10,"Sports Car",TRUE,4518,1,FALSE,1,1,"Highly Urban/ Urban",FALSE,FALSE,FALSE,FALSE,FALSE
+"943",NA,0,45,0,9,14484,FALSE,0,FALSE,"z_F","<High School","Clerical",20,"Private",2950,10,"Sports Car",TRUE,4518,1,FALSE,1,1,"Highly Urban/ Urban",FALSE,FALSE,FALSE,FALSE,FALSE
 "944",NA,0,48,0,10,144241,FALSE,0,FALSE,"z_F","PhD","Manager",43,"Private",20720,1,"z_SUV",FALSE,23013,2,FALSE,4,24,"Highly Urban/ Urban",FALSE,FALSE,FALSE,FALSE,FALSE
 "945",NA,0,48,0,12,49082,FALSE,202791,TRUE,"z_F","Bachelors","z_Blue Collar",34,"Commercial",24800,4,"Sports Car",FALSE,42845,2,TRUE,2,12,"Highly Urban/ Urban",FALSE,FALSE,FALSE,FALSE,FALSE
 "946",NA,0,50,0,12,210115,FALSE,534957,TRUE,"M","PhD","Manager",24,"Commercial",28540,6,"Panel Truck",TRUE,9527,2,FALSE,2,14,"Highly Urban/ Urban",FALSE,FALSE,FALSE,TRUE,FALSE
