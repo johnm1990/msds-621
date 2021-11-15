@@ -23,8 +23,9 @@ if (!require("xtable",character.only = TRUE)) (install.packages("xtable",dep=TRU
 if (!require("dplyr",character.only = TRUE)) (install.packages("dplyr",dep=TRUE))
 if (!require("stringr",character.only = TRUE)) (install.packages("stringr",dep=TRUE))
 if (!require("Hmisc",character.only = TRUE)) (install.packages("Hmisc",dep=TRUE))
-if (!require("Hmisc",character.only = TRUE)) (install.packages("ClusterR",dep=TRUE))
-if (!require("Hmisc",character.only = TRUE)) (install.packages("cluster",dep=TRUE))
+if (!require("ClusterR",character.only = TRUE)) (install.packages("ClusterR",dep=TRUE))
+if (!require("cluster",character.only = TRUE)) (install.packages("cluster",dep=TRUE))
+if (!require("lattice",character.only = TRUE)) (install.packages("lattice",dep=TRUE))
 
 library(ggplot2)
 library(knitr)
@@ -46,6 +47,7 @@ require(corrgram)
 require(ggplot2)
 library(ClusterR)
 library(cluster)
+library(lattice)
 ```
 
  DATA 621 – Business Analytics and Data Mining
@@ -90,7 +92,7 @@ provided).
 - **URBANICITY**: Home/Work Area Unknown
 - **YOJ**: Years on Job People who stay at a job for a long time are usually more safe
 
-# DATA EXPLORATION
+## 1. Data Exploration
 Describe the size and the variables in the  insurance training data set. Consider that too much detail will cause a 
 manager to lose interest while too little detail will make the manager consider that you aren’t doing your job. Some 
 suggestions are given below. Please do NOT treat this as a check list of things to do to complete the assignment. 
@@ -104,7 +106,7 @@ d. Are any of the variables missing and need to be imputed “fixed”?
 
 
 
-# DATA PREPARATION
+## 2. Data Preparation
 Describe how you have transformed the data by changing the original variables or creating new variables. If you 
 did transform the data or create new variables, discuss why you did this. Here are some possible transformations. 
  
@@ -425,7 +427,7 @@ t_travtarget<- t.test(ins_train_df$TRAVTIME~ ins_train_df$TARGET_FLAG)
 t_travtarget
 
 #percentages is better because same scale for both graphs
-library('lattice')
+
 histogram(~ INCOME | TARGET_FLAG, data = ins_train_df)
 histogram(~ HOME_VAL | TARGET_FLAG, data = ins_train_df)
 histogram(~ CLM_FREQ | TARGET_FLAG, data = ins_train_df)
