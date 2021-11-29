@@ -1,0 +1,331 @@
+---
+title: "Homework #5:  Count Regression Models"
+author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath, Arushi Arora"
+date: "11/28/2021"
+output:
+  html_document: 
+    toc: true
+    toc-title: "Homework #5:  Count Regression Models"
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    theme: journal
+    highlight: zenburn
+  pdf_document: default
+---
+
+```{r setup and packages, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+if (!require("ggplot2",character.only = TRUE)) (install.packages("ggplot2",dep=TRUE))
+if (!require("knitr",character.only = TRUE)) (install.packages("knitr",dep=TRUE))
+if (!require("xtable",character.only = TRUE)) (install.packages("xtable",dep=TRUE))
+if (!require("dplyr",character.only = TRUE)) (install.packages("dplyr",dep=TRUE))
+if (!require("stringr",character.only = TRUE)) (install.packages("stringr",dep=TRUE))
+if (!require("Hmisc",character.only = TRUE)) (install.packages("Hmisc",dep=TRUE))
+if (!require("ClusterR",character.only = TRUE)) (install.packages("ClusterR",dep=TRUE))
+if (!require("cluster",character.only = TRUE)) (install.packages("cluster",dep=TRUE))
+if (!require("pscl",character.only = TRUE)) (install.packages("pscl",dep=TRUE))
+if (!require("AER",character.only = TRUE)) (install.packages("AER",dep=TRUE))
+if (!require("corrgram",character.only = TRUE)) (install.packages("corrgram",dep=TRUE))
+
+
+library(MASS)
+library(pscl)
+library(AER)
+library(dplyr)
+library(ggplot2)
+library(Hmisc)
+library(corrplot)
+library(MASS)
+library(caret)
+library(tidyr)
+library(data.table)
+require(car)
+require(corrgram)
+require(ggplot2)
+library(ClusterR)
+library(cluster)
+library(kableExtra)
+library(pscl)
+library(AER)
+library(corrgram)
+
+```
+# OVERVIEW 
+
+In  this  homework  assignment,  you  will  explore,  analyze  and  model  a  data  set  containing  information  on 
+approximately 12,000 commercially available wines. The variables are mostly related to the chemical properties of 
+the wine being sold. The response variable is the number of sample cases of wine that were purchased by wine 
+distribution  companies  after  sampling  a  wine.  These  cases  would  be  used  to  provide  tasting  samples  to 
+restaurants  and  wine  stores  around  the  United  States.  The  more  sample  cases  purchased,  the  more  likely  is  a 
+wine  to  be  sold  at  a  high  end  restaurant.  A  large  wine  manufacturer  is  studying  the  data  in  order  to  predict  the 
+number  of  wine  cases  ordered  based  upon  the  wine  characteristics.  If  the  wine  manufacturer  can  predict  the 
+number of cases, then that manufacturer will be able to adjust their wine offering to maximize sales. 
+ 
+Your  objective  is  to  build  a  count  regression  model  to  predict  the  number  of  cases  of  wine  that  will  be  sold 
+given certain properties of the wine. HINT: Sometimes, the fact that a variable is missing is actually predictive of 
+the target. You can only use the variables given to you (or variables that you derive from the variables provided). 
+Below is a short description of the variables of interest in the data set:
+
+-**INDEX**:    Identification Variable (do not use) None
+
+-**TARGET**: Number of Cases Purchased None
+
+-**AcidIndex**: Proprietary method of testing total acidity of wine by using a weighted average
+
+-**Alcohol**: Alcohol Content
+
+-**Chlorides**: Chloride content of wine
+
+-**CitricAcid**: Citric Acid Content
+
+-**Density**: Density of Wine
+
+-**FixedAcidity**: Fixed Acidity of Wine
+
+-**FreeSulfurDioxide**: Sulfur Dioxide content of wine
+
+-**LabelAppeal**:
+Marketing Score indicating the appeal of label design for consumers. High numbers 
+suggest customers like the label design. Negative numbers suggest customes 
+don't like the design.
+Many consumers purchase based on the visual appeal of the 
+wine label design. Higher numbers suggest better sales.
+
+-**ResidualSugar**: Residual Sugar of wine
+
+-**STARS**: Wine rating by a team of experts. 4 Stars = Excellent, 1 Star = Poor A high number of stars suggests high sales
+
+-**Sulphates**: Sulfate content of wine
+
+-**TotalSulfurDioxide**: Total Sulfur Dioxide of Wine
+
+-**VolatileAcidity**: Volatile Acid content of wine
+
+-**pH**: pH of wine
+
+```{r}
+#importing the train an eval data
+wine_train_df<- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/wine-training-data.csv")
+wine_train_df <- wine_train_df[,2:16]
+wine_eval_df<- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/wine-evaluation-data.csv")
+wine_eval_df <- wine_eval_df[,2:16]
+
+#per assignment instructions, we don't use first column 'ID', so we remove it, we performed in above manner to keep all rows
+```
+
+# DATA EXPLORATION
+
+We are provided with two datasets on commercially available wine, one for the purpose of training our model with 12,796 observations of 16 variables and an evaluation dataset with 3,335 observations. The training dataset includes one response variable, TARGET, the number of cases purchased.  TARGET is a continuous variable, with values between 0 and 8 in the training data. Because we are analyzing this data with the intention of maximizing sales for this wine manufacturer, we’ll be creating models to better understand how much wine is ordered based on the wine’s characteristics. 
+
+To begin our exploration of the data, we start with a broad look at the variables. 
+ 
+There are missing observations in ResidualSugar, Chlorides, FreeSulfurDioxide, TotalSulfurDioxide, pH, Sulphates, Alcohol, and STARS. STARS has the greatest rate of missingness with 26% null observations, while Sulphates has just under 10% null observations, followed by ResidualSugar, Chlorides, FreeSulfurDioxide, TotalSulfurDioxide, and Alcohol all with about 5% null observations. Do observations with one null have multiple nulls across variables? Or are the nulls scattered throughout observations? Look at just the null values to understand them better. We will have to decide how to handle data missingness in the subsequent section. 
+
+Now, we can dig deeper into each variables’ distribution to see if there are any integrity red flags or challenges with skewness. Strangely enough, we appear to have a dataset filled with variables that are normally distributed. Looking at these histograms, we might potentially be interested in a few transformations. AcidIndex, a proprietary method of testing total acidity of wine by using a weighted average, appears to be ever so slightly right-skewed, but it’s a scaled composite variable so may be best left as is. STARS, with all it’s missing observations, is also less than normally distributed. Depending on how we handle those missing observations, we’ll be able to transform and/or handle the variable appropriately. It’s also interesting to notice that our TARGET variable is the least normally distributed, with a large number of 0s and a conspicuous gap of observations between 4 and 5. Are there any other variables with suspicious distributions /minimums /maximums/0s/means? 
+
+With a better understanding of individual variables, we can begin to look at how the variables are correlated. When we create a correlation table on complete observations, we see that there’s not a lot of correlation between predictor variables. It will be interesting to look at correlation again once we’ve addressed nulls. There is the strongest positive correlation between STARS and TARGET, which theoretically makes sense given that STARS is the “wine rating by a team of experts. 4 Stars = Excellent, 1 Star = Poor”. LabelAppeal has the second strongest positive correlation with TARGET, and is another theoretically direct measurement of a customer’s willingness to buy a specific wine. The strongest negative correlation is between AcidIndex and Target. Depending on how the index is set up, this may indicate that consumers have a strong preference for or against more acidic wines.
+
+What else would we like to call out in our data exploration?
+
+
+```{r Section 1}
+summary(wine_train_df)
+#we needed to check the variances of the variables with high ranges
+#note Standard Deviation is huge for 'FreesulfureDioxide' and 'TotalSulfureDioxide' and to lower extent 'ResidualSugar'
+#notice that 'FreesulfureDioxide' and 'TotalSulfureDioxide' appear to include negative values
+#'STARS' has exceptionally high number of missing values, as well as multiple chemical properties
+#important to note the LOG cannot take negative values
+
+kable(format(sapply(wine_train_df, function(wine_train_df) c( "Stand dev" = round(sd(wine_train_df, na.rm = T),2), 
+                         "Mean"= mean(wine_train_df,na.rm=TRUE),
+                         "n" = length(wine_train_df),
+                         "Median" = median(wine_train_df,na.rm = TRUE),
+                         "CoeffofVariation" = sd(wine_train_df)/mean(wine_train_df,na.rm=TRUE),
+                         "Minimum" = min(wine_train_df),
+                         "Maximum" = max(wine_train_df),
+                         "Upper Quantile" = quantile(wine_train_df,1,na.rm = TRUE),
+                         "LowerQuartile" = quantile(wine_train_df,0,na.rm = TRUE)
+                    )
+), scientific = FALSE)
+)
+
+#We might need to transform the 'FreesulfureDioxide' and 'TotalSulfureDioxide'
+#NA's Flags: Explore if they have impact on 'TARGET', if yes, then impute?
+#equal to the mean or significantly different from those with without N/A's in terms of 'TARGET' variable
+
+#VISUAL EXPLORATION
+ggplot(gather(wine_train_df), aes(value)) + 
+    geom_histogram(bins = 10) + 
+    facet_wrap(~key, scales = 'free_x')
+
+hist(wine_train_df$TARGET)
+table(wine_train_df$TARGET)
+
+
+#Corr matrix and the scatterplot matrix
+
+##correlation matrix
+wine_train_df.rcorr = rcorr(as.matrix(wine_train_df))
+wine_train_df.rcorr
+
+#notice when running above correlation matrix that the correlation between STARS and the target variable is high,  the higher of a rating the more samples were requested by distribution companies for a specific brand
+
+#very important to note, also when viewing our correlation matrix, in terms of our 'TARGET' variable and the complete variables, we also have 'LabelAppeal' appears to be a variable which is highly correlated with 'TARGET', 'AcidIndex' can be considered similarly so. 
+
+
+wine_train_df.cor = cor(wine_train_df, use = "pairwise.complete.obs")
+corrplot(wine_train_df.cor)
+#notice that when initially first using "complete.obs", it gives error because of various N/A's throughout our data
+#"complete.obs" above initially failed because it only calculates correlations based on rows that don't have N/A's (every row has an N/A somewhere apparently)
+#if use has the value "pairwise.complete.obs" then the correlation between each pair of variables is computed using all complete pairs of observations on those variables.
+
+
+# 'STARS', 'AcidIndex', 'LabelAppeal' are the ones with the highest correlation with the 'TARGET' variable
+#Basically, for every value of 'STARS', ie 'STARS=1 or =2 or =3 or =4, it shows the distribution the 'TARGET' variable in each case
+#You'll notice, for example when 'STARS'=4, the target variable generally has more high value than low values
+histogram(~ TARGET | STARS, data = wine_train_df)
+
+#'LabelAppeal'  has range from min -2 and max 2, this can possibly be thought of as categorical
+#using 'LabelAppeal' we can think of -2 as "very Bad", 1 as "Bad", 0 as neutral, 1 as "good", 2 as "very good"
+#IMPORTANT to note the higher the label appeal, then the higher the demand for samples for specific brand  
+histogram(~ TARGET | LabelAppeal, data = wine_train_df)
+
+#Note 'AcidIndex' is NOT categorical, we cannot put one graph per every value of 'AcidIndex'. Instead we can switch and use 'TARGET' and have 'AcidIndex' as the histogram
+#viewing the histogram, we can say that the ones with high 'TARGET' value should have lower 'AcidIndex'. As we go lower and lower according to 'TARGET' variable then the 'AcidIndex' should get higher. This makes sense since 'AcidIndex' appeared to be negatively correlated  (-0.25)
+histogram(~ AcidIndex | TARGET, data = wine_train_df)
+
+cor_stars_tgt <- cor.test(wine_train_df$STARS, wine_train_df$TARGET)
+cor_stars_tgt
+
+cor_lbl_tgr <- cor.test(wine_train_df$LabelAppeal, wine_train_df$TARGET)
+cor_lbl_tgr
+
+cor_acid_tgt <- cor.test(wine_train_df$AcidIndex, wine_train_df$TARGET)
+cor_acid_tgt
+#we tested the significance of the three correlation, with 5% significant level, they are all significant
+
+
+#T-test (DIDNT WORK)
+#because t-test only works if the grouping variable, only has two groups
+#t_AcidIndextarget <- t.test(wine_train_df$AcidIndex~ wine_train_df$TARGET)
+#t_AcidIndextarget
+
+
+# Compute the analysis of variance, when has more than two groups perform ANOVA
+res.aov <- aov(AcidIndex ~ TARGET, data = wine_train_df)
+# Summary of the analysis
+summary(res.aov)
+
+#potentially acid index has a potential effect on TARGET variable
+
+```
+
+# DATA PREPARATION
+
+Dropping missing data has important implications on a model’s ability to predict on an evaluation dataset. When all nulls and missing data are removed, the means and medians of the variables change. With no nulls or missing data, there are 6,436 observations total. While this isn’t a bad amount of sample, it does reduce the observations by half of the original dataset. Below, you can see how the removal has affected the medians and means of each variable.
+
+Because data is rarely perfect and simply removing missing data introduces a certain type of bias, we can also try imputing missing data based on XXX. 
+
+We can also explore the transformation of variables, either through log transformation or interaction variables. These transformations will be discussed on a model-specific basis in the Build Models selection, as well as highlighted in the R codes included in the Appendix. 
+
+
+```{r section 2}
+
+# #For these ones, they seem more random, the 'missingness' may not have any indications, we impute using mean or conditional mean on target. 
+# ResidualSugar
+# Chlorides
+# FreeSulfurDioxide
+# TotalSulfurDioxide
+# pH
+# Alcohol
+
+#we are creating groups based on TARGET, replace missing value
+wine_train_df <- wine_train_df %>% 
+            mutate(ResidualSugar= ifelse(is.na(ResidualSugar), 
+                                         mean(ResidualSugar, na.rm=TRUE),ResidualSugar),
+                   Chlorides= ifelse(is.na(Chlorides), 
+                                         mean(Chlorides, na.rm=TRUE),Chlorides),
+                   FreeSulfurDioxide= ifelse(is.na(FreeSulfurDioxide), 
+                                         mean(FreeSulfurDioxide, na.rm=TRUE),FreeSulfurDioxide),
+                   TotalSulfurDioxide= ifelse(is.na(TotalSulfurDioxide), 
+                                         mean(TotalSulfurDioxide, na.rm=TRUE),TotalSulfurDioxide),
+                   pH= ifelse(is.na(pH), 
+                                         mean(pH, na.rm=TRUE),pH),
+                   Alcohol= ifelse(is.na(Alcohol), 
+                                         mean(Alcohol, na.rm=TRUE),Alcohol),
+                   )
+
+#LOG TRANSFORMATION
+#Log transformation for the variables with high variance, the variables are translated first so that we get rid of the negative values so that the log function can handle them
+#we transform 'y' like in last assignment, instead of log(y), we can do y + 1 - min(y)
+#for example, the minimum of 'FreeSulfurDioxide' is -555,  this will transform all the values of 'FreeSulfurDioxide by 555, so the -555 is not in the negative range(will be positive) and log() will be able to handle
+
+#A common technique for handling negative values is to add a constant value to the data prior to applying the log transform. The transformation is therefore log(Y+a) where a is the constant. Some people like to choose a so that min(Y+a) is a very small positive number (like 0.001). Others choose a so that min(Y+a) = 1. For the latter choice, you can show that a = b – min(Y), where b is either a small number or is 1. 
+
+wine_train_df$FreeSulfurDioxide_log <- log(wine_train_df$FreeSulfurDioxide + 1 - min(wine_train_df$FreeSulfurDioxide))
+wine_train_df$TotalSulfurDioxide_log <- log(wine_train_df$TotalSulfurDioxide + 1 - min(wine_train_df$TotalSulfurDioxide))                   
+                   
+# #Flags for N/A's:
+# #These ones need careful consideration as the percentage of N/A's is significant
+# Sulphates(*)
+# STARS(***)
+
+#OBSERVATION: we notice some variable with "low-ish" N/A's, when we explored the data we saw that every single brand has an N/A in these properties. It may be that these N/A's are random. It may not be the case that specific brands are 'bad' or 'low price' since they have N/A's in certain properties. The N/A's we see dispersed among the different brands     
+
+wine_train_df <- wine_train_df %>% 
+            mutate(Sulphates_flag= ifelse(is.na(Sulphates),1,0),
+                   STARS_flag= ifelse(is.na(STARS),1,0)
+                   )
+#flags = will create 1 if NA
+histogram(~ TARGET | STARS_flag, data = wine_train_df)
+histogram(~ TARGET | Sulphates_flag, data = wine_train_df)
+
+#left, stars_flag=0 and right side graph=1 missing data
+
+#histogram on the left STARS_flag has no missing data, the average is higher
+##histogram on the left STARS_flag has missing data, the average is generally lower
+###We might assume that those with missing data generally are less purchases or of lower quality
+
+#sulphates_flag with 0 and 1 are similar(symmetrical)
+
+
+#corrective actions
+wine_train_df <- wine_train_df %>% 
+            mutate(Sulphates= ifelse(is.na(Sulphates), 
+                                         mean(Sulphates, na.rm=TRUE),Sulphates),
+                   STARS_merged=ifelse(is.na(STARS),0,STARS))
+#if it is missing it will equal to 0, if has a value it will stay same
+
+#you will see includes 0 for missing values
+table(wine_train_df$STARS_merged) 
+
+##you will see includes no 0 columns
+table(wine_train_df$STARS)
+
+
+#creating clusters for acid index
+kmeans.re <- kmeans(wine_train_df$AcidIndex, centers = 5)
+table(kmeans.re$cluster)
+wine_train_df$AcidIndex_clusters <- kmeans.re$cluster
+
+histogram(~ TARGET | AcidIndex_clusters, data = wine_train_df)
+#the higher the acidindex the lower the target variable
+#other clusters are almost identical in shape, generally even distributed
+#better to switch to original acidindex variable
+
+```
+
+# BUILD THE MODELS
+
+Poisson Regression Models (2)
+
+Negative Binomial Regression Models (2)
+
+Multiple Linear Regression Models (2)
+
+From assignment: Using the training data set, build at least two different poisson regression models, at least two different negative binomial regression models, and at least two multiple linear regression models, using different variables (or the same variables with different transformations). Sometimes poisson and negative binomial regression models give the same results. If that is the case, comment on that. Consider changing the input variables if that occurs so that you get different models. Although not covered in class, you may also want to consider building zero-inflated poisson and negative binomial regression models. You may select the variables manually, use an approach such as Forward or Stepwise, use a different approach such as trees, or use a combination of techniques. Describe the techniques you used. If you manually selected a variable for inclusion into the model or exclusion into the model, indicate why this was done. Discuss the coefficients in the models, do they make sense? In this case, about the only thing you can comment on is the number of stars and the wine label appeal. However, you might comment on the coefficient and magnitude of variables and how they are similar or different from model to model. For example, you might say “pH seems to have a major positive impact in my poisson regression model, but a negative effect in my multiple linear regression model”. Are you keeping the model even though it is counter intuitive? Why? The boss needs to know.
+
+# SELECT THE MODELS
