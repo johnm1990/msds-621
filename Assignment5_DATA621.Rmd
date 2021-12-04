@@ -29,7 +29,7 @@ if (!require("cluster",character.only = TRUE)) (install.packages("cluster",dep=T
 if (!require("pscl",character.only = TRUE)) (install.packages("pscl",dep=TRUE))
 if (!require("AER",character.only = TRUE)) (install.packages("AER",dep=TRUE))
 if (!require("corrgram",character.only = TRUE)) (install.packages("corrgram",dep=TRUE))
-
+if (!require("stargazer",character.only = TRUE)) (install.packages("stargazer",dep=TRUE))
 
 library(MASS)
 library(pscl)
@@ -51,6 +51,7 @@ library(kableExtra)
 library(pscl)
 library(AER)
 library(corrgram)
+library(stargazer)
 
 ```
 # OVERVIEW 
@@ -320,12 +321,121 @@ histogram(~ TARGET | AcidIndex_clusters, data = wine_train_df)
 
 # BUILD THE MODELS
 
-Poisson Regression Models (2)
+Using the training data set, build at least two different poisson regression models, at least two different
+negative binomial regression models, and at least two multiple linear regression models, using different
+variables (or the same variables with different transformations). Sometimes poisson and negative
+binomial regression models give the same results. If that is the case, comment on that. Consider
+changing the input variables if that occurs so that you get different models. Although not covered in class,
+you may also want to consider building zero-inflated poisson and negative binomial regression models.
+You may select the variables manually, use an approach such as Forward or Stepwise, use a different
+approach such as trees, or use a combination of techniques. Describe the techniques you used. If you
+manually selected a variable for inclusion into the model or exclusion into the model, indicate why this
+was done.
+Discuss the coefficients in the models, do they make sense? In this case, about the only thing you can
+comment on is the number of stars and the wine label appeal. However, you might comment on the
+coefficient and magnitude of variables and how they are similar or different from model to model. For
+example, you might say “pH seems to have a major positive impact in my poisson regression model, but a
+negative effect in my multiple linear regression model”. Are you keeping the model even though it is
+counter intuitive? Why? The boss needs to know.
 
-Negative Binomial Regression Models (2)
 
-Multiple Linear Regression Models (2)
 
-From assignment: Using the training data set, build at least two different poisson regression models, at least two different negative binomial regression models, and at least two multiple linear regression models, using different variables (or the same variables with different transformations). Sometimes poisson and negative binomial regression models give the same results. If that is the case, comment on that. Consider changing the input variables if that occurs so that you get different models. Although not covered in class, you may also want to consider building zero-inflated poisson and negative binomial regression models. You may select the variables manually, use an approach such as Forward or Stepwise, use a different approach such as trees, or use a combination of techniques. Describe the techniques you used. If you manually selected a variable for inclusion into the model or exclusion into the model, indicate why this was done. Discuss the coefficients in the models, do they make sense? In this case, about the only thing you can comment on is the number of stars and the wine label appeal. However, you might comment on the coefficient and magnitude of variables and how they are similar or different from model to model. For example, you might say “pH seems to have a major positive impact in my poisson regression model, but a negative effect in my multiple linear regression model”. Are you keeping the model even though it is counter intuitive? Why? The boss needs to know.
+
+```{r}
+#multiple reg
+model.manual.mr <- lm(TARGET ~ STARS_merged+LabelAppeal+AcidIndex, data = wine_train_df)
+summary(model.manual.mr)
+
+
+#
+
+fullmod_regressiondata <- wine_train_df %>% 
+  dplyr::select(TARGET,FixedAcidity,VolatileAcidity,CitricAcid,
+    ResidualSugar,Chlorides,Density,pH,Sulphates,Alcohol,LabelAppeal,AcidIndex, 
+   FreeSulfurDioxide_log,TotalSulfurDioxide_log, 
+    STARS_merged)
+
+
+#
+model.full.mr  <- lm(TARGET ~ . , data = fullmod_regressiondata)
+summary(model.full.mr)
+
+model.forward.mr <- model.full.mr %>% stepAIC(direction = "forward", trace = FALSE)
+summary(model.forward.mr)
+
+#Getting formula for the model 
+formula(model.forward.mr)
+
+
+model.backward.mr <- model.full.mr %>% stepAIC(direction = "backward", trace = FALSE)
+summary(model.backward.mr)
+AIC(model.backward.mr)
+
+#Getting formula for the model 
+formula(model.backward.mr)
+```
+
+
+
+```{r}
+#manual poisson
+model.manual.poisson <- glm(TARGET ~ STARS_merged+LabelAppeal+AcidIndex, data = wine_train_df,family = poisson)
+summary(model.manual.poisson)
+
+
+model.full.poisson  <- glm(TARGET ~ . , data = fullmod_regressiondata,family=poisson)
+summary(model.full.poisson)
+
+model.forward.poisson <- model.full.poisson %>% stepAIC(direction = "forward", trace = FALSE)
+summary(model.forward.poisson)
+
+#Getting formula for the model 
+formula(model.forward.poisson)
+
+
+model.backward.poisson<-model.full.poisson %>% stepAIC(direction = "backward", trace = FALSE)
+summary(model.backward.poisson)
+
+#Getting formula for the model 
+formula(model.backward.poisson)
+
+```
+
+Backward consistently provided better results.
+
+
+```{r}
+
+#negative binomial
+model.manual.negbin <- glm.nb(TARGET ~ STARS_merged+LabelAppeal+AcidIndex, data = wine_train_df)
+summary(model.manual.negbin)
+
+#Step 1: Create a full model
+model.full.negbin  <- glm.nb(TARGET ~ . , data = fullmod_regressiondata)
+summary(model.full.negbin )
+
+model.forward.negbin <- model.full.negbin %>% stepAIC(direction = "forward", trace = FALSE)
+summary(model.forward.negbin)
+
+#Getting formula for the model 
+formula(model.forward.negbin)
+
+
+model.backward.negbin <-model.full.negbin %>% stepAIC(direction = "backward", trace = FALSE)
+summary(model.backward.negbin)
+
+#Getting formula for the model 
+formula(model.backward.negbin)
+
+
+```
+
+
+```{r, results='asis'}
+
+stargazer(model.manual.negbin, model.manual.poisson, model.manual.mr, title="Results", align=TRUE)#, header=FALSE, type='latex')
+
+
+```
 
 # SELECT THE MODELS
