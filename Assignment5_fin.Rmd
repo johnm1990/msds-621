@@ -1,0 +1,350 @@
+---
+title: 'Homework #5:  Count Regression Models'
+author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath, Arushi"
+date: "11/28/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+header-includes: \usepackage{dcolumn}
+---
+
+
+
+```{r setup and packages, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+if (!require("ggplot2",character.only = TRUE)) (install.packages("ggplot2",dep=TRUE))
+if (!require("knitr",character.only = TRUE)) (install.packages("knitr",dep=TRUE))
+if (!require("xtable",character.only = TRUE)) (install.packages("xtable",dep=TRUE))
+if (!require("dplyr",character.only = TRUE)) (install.packages("dplyr",dep=TRUE))
+if (!require("stringr",character.only = TRUE)) (install.packages("stringr",dep=TRUE))
+if (!require("Hmisc",character.only = TRUE)) (install.packages("Hmisc",dep=TRUE))
+if (!require("ClusterR",character.only = TRUE)) (install.packages("ClusterR",dep=TRUE))
+if (!require("cluster",character.only = TRUE)) (install.packages("cluster",dep=TRUE))
+if (!require("pscl",character.only = TRUE)) (install.packages("pscl",dep=TRUE))
+if (!require("AER",character.only = TRUE)) (install.packages("AER",dep=TRUE))
+if (!require("corrgram",character.only = TRUE)) (install.packages("corrgram",dep=TRUE))
+if (!require("stargazer",character.only = TRUE)) (install.packages("stargazer",dep=TRUE))
+if (!require("ROCR",character.only = TRUE)) (install.packages("ROCR",dep=TRUE))
+
+library(MASS)
+library(pscl)
+library(AER)
+library(dplyr)
+library(ggplot2)
+library(Hmisc)
+library(corrplot)
+library(MASS)
+library(caret)
+library(tidyr)
+library(data.table)
+require(car)
+require(corrgram)
+require(ggplot2)
+library(ClusterR)
+library(cluster)
+library(kableExtra)
+library(pscl)
+library(AER)
+library(corrgram)
+library(stargazer)
+library(ROCR)
+
+
+```
+# OVERVIEW 
+
+In  this  homework  assignment,  you  will  explore,  analyze  and  model  a  data  set  containing  information  on 
+approximately 12,000 commercially available wines. The variables are mostly related to the chemical properties of 
+the wine being sold. The response variable is the number of sample cases of wine that were purchased by wine 
+distribution  companies  after  sampling  a  wine.  These  cases  would  be  used  to  provide  tasting  samples  to 
+restaurants  and  wine  stores  around  the  United  States.  The  more  sample  cases  purchased,  the  more  likely  is  a 
+wine  to  be  sold  at  a  high  end  restaurant.  A  large  wine  manufacturer  is  studying  the  data  in  order  to  predict  the 
+number  of  wine  cases  ordered  based  upon  the  wine  characteristics.  If  the  wine  manufacturer  can  predict  the 
+number of cases, then that manufacturer will be able to adjust their wine offering to maximize sales. 
+ 
+Your  objective  is  to  build  a  count  regression  model  to  predict  the  number  of  cases  of  wine  that  will  be  sold 
+given certain properties of the wine. HINT: Sometimes, the fact that a variable is missing is actually predictive of 
+the target. You can only use the variables given to you (or variables that you derive from the variables provided). 
+Below is a short description of the variables of interest in the data set:
+
+-**INDEX**:    Identification Variable (do not use) None
+
+-**TARGET**: Number of Cases Purchased None
+
+-**AcidIndex**: Proprietary method of testing total acidity of wine by using a weighted average
+
+-**Alcohol**: Alcohol Content
+
+-**Chlorides**: Chloride content of wine
+
+-**CitricAcid**: Citric Acid Content
+
+-**Density**: Density of Wine
+
+-**FixedAcidity**: Fixed Acidity of Wine
+
+-**FreeSulfurDioxide**: Sulfur Dioxide content of wine
+
+-**LabelAppeal**:
+Marketing Score indicating the appeal of label design for consumers. High numbers 
+suggest customers like the label design. Negative numbers suggest customes 
+don't like the design.
+Many consumers purchase based on the visual appeal of the 
+wine label design. Higher numbers suggest better sales.
+
+-**ResidualSugar**: Residual Sugar of wine
+
+-**STARS**: Wine rating by a team of experts. 4 Stars = Excellent, 1 Star = Poor A high number of stars suggests high sales
+
+-**Sulphates**: Sulfate content of wine
+
+-**TotalSulfurDioxide**: Total Sulfur Dioxide of Wine
+
+-**VolatileAcidity**: Volatile Acid content of wine
+
+-**pH**: pH of wine
+
+```{r}
+#importing the train an eval data
+wine_train_df<- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/wine-training-data.csv")
+wine_train_df <- wine_train_df[,2:16]
+wine_eval_df<- read.csv("https://raw.githubusercontent.com/johnm1990/msds-621/main/wine-evaluation-data.csv")
+wine_eval_df <- wine_eval_df[,2:16]
+#per assignment instructions, we don't use first column 'ID', so we remove it, we performed in above manner to keep all rows
+```
+
+# DATA EXPLORATION
+
+```{r Section 1}
+summary(wine_train_df)
+kable(format(sapply(wine_train_df, function(wine_train_df) c( "Stand dev" = round(sd(wine_train_df, na.rm = T),2), 
+                         "Mean"= mean(wine_train_df,na.rm=TRUE),
+                         "n" = length(wine_train_df),
+                         "Median" = median(wine_train_df,na.rm = TRUE),
+                         "CoeffofVariation" = sd(wine_train_df)/mean(wine_train_df,na.rm=TRUE),
+                         "Minimum" = min(wine_train_df),
+                         "Maximum" = max(wine_train_df),
+                         "Upper Quantile" = quantile(wine_train_df,1,na.rm = TRUE),
+                         "LowerQuartile" = quantile(wine_train_df,0,na.rm = TRUE)
+                    )
+), scientific = FALSE)
+)
+
+ggplot(gather(wine_train_df), aes(value)) + 
+    geom_histogram(bins = 10) + 
+    facet_wrap(~key, scales = 'free_x')
+hist(wine_train_df$TARGET)
+table(wine_train_df$TARGET)
+#Corr matrix and the scatterplot matrix
+##correlation matrix
+wine_train_df.rcorr = rcorr(as.matrix(wine_train_df))
+wine_train_df.rcorr
+
+wine_train_df.cor = cor(wine_train_df, use = "pairwise.complete.obs")
+corrplot(wine_train_df.cor)
+
+histogram(~ TARGET | STARS, data = wine_train_df)
+histogram(~ TARGET | LabelAppeal, data = wine_train_df)
+histogram(~ AcidIndex | TARGET, data = wine_train_df)
+cor_stars_tgt <- cor.test(wine_train_df$STARS, wine_train_df$TARGET)
+cor_stars_tgt
+cor_lbl_tgr <- cor.test(wine_train_df$LabelAppeal, wine_train_df$TARGET)
+cor_lbl_tgr
+cor_acid_tgt <- cor.test(wine_train_df$AcidIndex, wine_train_df$TARGET)
+cor_acid_tgt
+
+# Compute the analysis of variance, when has more than two groups perform ANOVA
+res.aov <- aov(AcidIndex ~ TARGET, data = wine_train_df)
+# Summary of the analysis
+summary(res.aov)
+```
+
+# DATA PREPARATION
+
+
+```{r section 2}
+wine_train_df <- wine_train_df %>% 
+            mutate(ResidualSugar= ifelse(is.na(ResidualSugar), 
+                                         mean(ResidualSugar, na.rm=TRUE),ResidualSugar),
+                   Chlorides= ifelse(is.na(Chlorides), 
+                                         mean(Chlorides, na.rm=TRUE),Chlorides),
+                   FreeSulfurDioxide= ifelse(is.na(FreeSulfurDioxide), 
+                                         mean(FreeSulfurDioxide, na.rm=TRUE),FreeSulfurDioxide),
+                   TotalSulfurDioxide= ifelse(is.na(TotalSulfurDioxide), 
+                                         mean(TotalSulfurDioxide, na.rm=TRUE),TotalSulfurDioxide),
+                   pH= ifelse(is.na(pH), 
+                                         mean(pH, na.rm=TRUE),pH),
+                   Alcohol= ifelse(is.na(Alcohol), 
+                                         mean(Alcohol, na.rm=TRUE),Alcohol),
+                   )
+
+wine_eval_df <- wine_eval_df %>% 
+            mutate(ResidualSugar= ifelse(is.na(ResidualSugar), 
+                                         mean(ResidualSugar, na.rm=TRUE),ResidualSugar),
+                   Chlorides= ifelse(is.na(Chlorides), 
+                                         mean(Chlorides, na.rm=TRUE),Chlorides),
+                   FreeSulfurDioxide= ifelse(is.na(FreeSulfurDioxide), 
+                                         mean(FreeSulfurDioxide, na.rm=TRUE),FreeSulfurDioxide),
+                   TotalSulfurDioxide= ifelse(is.na(TotalSulfurDioxide), 
+                                         mean(TotalSulfurDioxide, na.rm=TRUE),TotalSulfurDioxide),
+                   pH= ifelse(is.na(pH), 
+                                         mean(pH, na.rm=TRUE),pH),
+                   Alcohol= ifelse(is.na(Alcohol), 
+                                         mean(Alcohol, na.rm=TRUE),Alcohol),
+                   )
+
+
+
+
+#LOG TRANSFORMATION
+
+wine_train_df$FreeSulfurDioxide_log <- log(wine_train_df$FreeSulfurDioxide + 1 - min(wine_train_df$FreeSulfurDioxide))
+wine_train_df$TotalSulfurDioxide_log <- log(wine_train_df$TotalSulfurDioxide + 1 - min(wine_train_df$TotalSulfurDioxide))
+
+wine_eval_df$FreeSulfurDioxide_log <- log(wine_eval_df$FreeSulfurDioxide + 1 - min(wine_eval_df$FreeSulfurDioxide))
+wine_eval_df$TotalSulfurDioxide_log <- log(wine_eval_df$TotalSulfurDioxide + 1 - min(wine_eval_df$TotalSulfurDioxide))  
+
+
+                   
+# #Flags for N/A's:
+    
+wine_train_df <- wine_train_df %>% 
+            mutate(Sulphates_flag= ifelse(is.na(Sulphates),1,0),
+                   STARS_flag= ifelse(is.na(STARS),1,0)
+                   )
+#flags = will create 1 if NA
+histogram(~ TARGET | STARS_flag, data = wine_train_df)
+histogram(~ TARGET | Sulphates_flag, data = wine_train_df)
+
+#corrective actions
+wine_train_df <- wine_train_df %>% 
+            mutate(Sulphates= ifelse(is.na(Sulphates), 
+                                         mean(Sulphates, na.rm=TRUE),Sulphates),
+                   STARS_merged=ifelse(is.na(STARS),0,STARS))
+
+wine_eval_df <- wine_eval_df %>% 
+            mutate(Sulphates= ifelse(is.na(Sulphates), 
+                                         mean(Sulphates, na.rm=TRUE),Sulphates),
+                   STARS_merged=ifelse(is.na(STARS),0,STARS))
+
+table(wine_train_df$STARS) 
+table(wine_train_df$STARS_merged)
+##you will see includes no 0 columns
+table(wine_train_df$STARS)
+
+#creating clusters for acid index
+kmeans.re <- kmeans(wine_train_df$AcidIndex, centers = 5)
+table(kmeans.re$cluster)
+wine_train_df$AcidIndex_clusters <- kmeans.re$cluster
+histogram(~ TARGET | AcidIndex_clusters, data = wine_train_df)
+
+```
+
+# BUILD THE MODELS
+
+
+
+```{r}
+#multiple reg
+model.manual.mr <- lm(TARGET ~ STARS_merged+LabelAppeal+AcidIndex, data = wine_train_df)
+summary(model.manual.mr)
+#
+fullmod_regressiondata <- wine_train_df %>% 
+  dplyr::select(TARGET,FixedAcidity,VolatileAcidity,CitricAcid,
+    ResidualSugar,Chlorides,Density,pH,Sulphates,Alcohol,LabelAppeal,AcidIndex, 
+   FreeSulfurDioxide_log,TotalSulfurDioxide_log, 
+    STARS_merged)
+#
+model.full.mr  <- lm(TARGET ~ . , data = fullmod_regressiondata)
+summary(model.full.mr)
+model.forward.mr <- model.full.mr %>% stepAIC(direction = "forward", trace = FALSE)
+summary(model.forward.mr)
+#Getting formula for the model 
+formula(model.forward.mr)
+model.backward.mr <- model.full.mr %>% stepAIC(direction = "backward", trace = FALSE)
+summary(model.backward.mr)
+AIC(model.backward.mr)
+#Getting formula for the model 
+formula(model.backward.mr)
+```
+
+
+
+```{r}
+#manual poisson
+model.manual.poisson <- glm(TARGET ~ STARS_merged+LabelAppeal+AcidIndex, data = wine_train_df,family = poisson)
+summary(model.manual.poisson)
+model.full.poisson  <- glm(TARGET ~ . , data = fullmod_regressiondata,family=poisson)
+summary(model.full.poisson)
+model.forward.poisson <- model.full.poisson %>% stepAIC(direction = "forward", trace = FALSE)
+summary(model.forward.poisson)
+#Getting formula for the model 
+formula(model.forward.poisson)
+model.backward.poisson<-model.full.poisson %>% stepAIC(direction = "backward", trace = FALSE)
+summary(model.backward.poisson)
+#Getting formula for the model 
+formula(model.backward.poisson)
+```
+
+Backward consistently provided better results.
+
+
+```{r}
+#negative binomial
+model.manual.negbin <- glm.nb(TARGET ~ STARS_merged+LabelAppeal+AcidIndex, data = wine_train_df)
+summary(model.manual.negbin)
+#Step 1: Create a full model
+model.full.negbin  <- glm.nb(TARGET ~ . , data = fullmod_regressiondata)
+summary(model.full.negbin )
+model.forward.negbin <- model.full.negbin %>% stepAIC(direction = "forward", trace = FALSE)
+summary(model.forward.negbin)
+#Getting formula for the model 
+formula(model.forward.negbin)
+model.backward.negbin <-model.full.negbin %>% stepAIC(direction = "backward", trace = FALSE)
+summary(model.backward.negbin)
+#Getting formula for the model 
+formula(model.backward.negbin)
+```
+
+
+
+
+# SELECT THE MODELS
+
+```{r, results='asis'}
+stargazer(model.full.mr, model.forward.poisson, model.forward.negbin, title="Results", align=TRUE)#, header=FALSE, type='latex')
+```
+
+
+
+Predictions
+
+```{r}
+predict1 <- predict(model.forward.mr, newdata=wine_eval_df, type="response")
+summary(predict1)
+write.csv(predict1, 'predict1.csv', row.names = FALSE)
+
+```
+
+
+```{r}
+predict2 <- predict(model.forward.poisson, newdata=wine_eval_df, type="response")
+summary(predict2)
+write.csv(predict2, 'predict2.csv', row.names = FALSE)
+
+```
+
+```{r}
+predict3 <- predict(model.forward.negbin, newdata=wine_eval_df, type="response")
+summary(predict3)
+write.csv(predict3, 'predict3.csv', row.names = FALSE)
+
+```
+
+
+
+
+
+
